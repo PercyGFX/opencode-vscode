@@ -1,0 +1,203 @@
+{
+  "name": "opencode-vscode",
+  "displayName": "OpenCode",
+  "description": "Chat with OpenCode 2 in VS Code: session tabs that stay in sync with the TUI, permission modes, and effort levels",
+  "version": "0.1.7",
+  "publisher": "percygfx",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/PercyGFX/opencode-vscode.git"
+  },
+  "engines": {
+    "vscode": "^1.105.0"
+  },
+  "categories": [
+    "AI",
+    "Chat"
+  ],
+  "keywords": [
+    "opencode",
+    "ai",
+    "agent",
+    "chat"
+  ],
+  "main": "./dist/extension.js",
+  "contributes": {
+    "viewsContainers": {
+      "secondarySidebar": [
+        {
+          "id": "opencode",
+          "title": "OpenCode",
+          "icon": "media/opencode.svg"
+        }
+      ]
+    },
+    "views": {
+      "opencode": [
+        {
+          "type": "webview",
+          "id": "opencode.chat",
+          "name": "Chat"
+        }
+      ]
+    },
+    "commands": [
+      {
+        "command": "opencode.open",
+        "title": "Open OpenCode",
+        "category": "OpenCode",
+        "icon": {
+          "light": "media/opencode-light.svg",
+          "dark": "media/opencode-dark.svg"
+        }
+      },
+      {
+        "command": "opencode.newSession",
+        "title": "New Session",
+        "category": "OpenCode",
+        "icon": "$(add)"
+      },
+      {
+        "command": "opencode.openInTab",
+        "title": "Open in New Tab",
+        "category": "OpenCode",
+        "icon": "$(link-external)"
+      },
+      {
+        "command": "opencode.reconnect",
+        "title": "Reconnect to Server",
+        "category": "OpenCode",
+        "icon": "$(refresh)"
+      },
+      {
+        "command": "opencode.acceptDiff",
+        "title": "Accept Change",
+        "category": "OpenCode",
+        "icon": "$(check)"
+      },
+      {
+        "command": "opencode.rejectDiff",
+        "title": "Reject Change",
+        "category": "OpenCode",
+        "icon": "$(close)"
+      }
+    ],
+    "menus": {
+      "editor/title": [
+        {
+          "command": "opencode.acceptDiff",
+          "when": "resourceScheme == opencode-diff && resource =~ /request=/",
+          "group": "navigation@1"
+        },
+        {
+          "command": "opencode.rejectDiff",
+          "when": "resourceScheme == opencode-diff && resource =~ /request=/",
+          "group": "navigation@2"
+        },
+        {
+          "command": "opencode.open",
+          "group": "navigation@9"
+        }
+      ],
+      "commandPalette": [
+        {
+          "command": "opencode.acceptDiff",
+          "when": "false"
+        },
+        {
+          "command": "opencode.rejectDiff",
+          "when": "false"
+        }
+      ],
+      "view/title": [
+        {
+          "command": "opencode.newSession",
+          "when": "view == opencode.chat",
+          "group": "navigation@1"
+        },
+        {
+          "command": "opencode.openInTab",
+          "when": "view == opencode.chat",
+          "group": "navigation@2"
+        },
+        {
+          "command": "opencode.reconnect",
+          "when": "view == opencode.chat",
+          "group": "navigation@3"
+        }
+      ]
+    },
+    "configuration": {
+      "title": "OpenCode",
+      "properties": {
+        "opencode.path": {
+          "type": "string",
+          "default": "",
+          "markdownDescription": "Path to the `opencode` executable, used to start the background server when it isn't running. Leave empty to find it on `PATH`."
+        },
+        "opencode.serverUrl": {
+          "type": "string",
+          "default": "",
+          "markdownDescription": "Connect to this server URL instead of the local background server (the same server the TUI uses)."
+        },
+        "opencode.defaultMode": {
+          "type": "string",
+          "enum": [
+            "manual",
+            "acceptEdits",
+            "plan",
+            "auto"
+          ],
+          "enumItemLabels": [
+            "Manual",
+            "Edit automatically",
+            "Plan",
+            "Auto"
+          ],
+          "default": "manual",
+          "description": "Permission mode for new sessions."
+        },
+        "opencode.autoModeAskPatterns": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": [
+            "*git push*",
+            "*git reset --hard*",
+            "*git clean*",
+            "*rm -rf*",
+            "*rm -r *",
+            "*sudo *",
+            "*npm publish*",
+            "*Remove-Item*",
+            "*rmdir*"
+          ],
+          "markdownDescription": "Shell command patterns that still need approval in **Auto** mode. `*` matches anything."
+        }
+      }
+    }
+  },
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "watch": "node scripts/build.mjs --watch",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "package": "vsce package --no-dependencies",
+    "vscode:prepublish": "node scripts/build.mjs --production"
+  },
+  "devDependencies": {
+    "@opencode/client": "2.2.5",
+    "@types/markdown-it": "^14.1.2",
+    "@types/node": "^22.20.5",
+    "@types/vscode": "1.105.0",
+    "@vscode/codicons": "^0.0.46-24",
+    "@vscode/vsce": "^4.1.0",
+    "esbuild": "^0.28.2",
+    "markdown-it": "^15.0.3",
+    "preact": "^10.29.8",
+    "typescript": "^5.9.3",
+    "vitest": "^3.2.7"
+  }
+}
