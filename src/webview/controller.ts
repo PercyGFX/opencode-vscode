@@ -86,6 +86,15 @@ export function createController(getState: () => State, dispatch: (action: Actio
     }
   }
 
+  const addMcp = async (name: string) => {
+    try {
+      await request("addMcp", { name })
+    } catch (error) {
+      notice(error)
+    }
+    await loadMcp()
+  }
+
   const setMcpConnected = async (server: string, connected: boolean) => {
     try {
       await request(connected ? "connectMcp" : "disconnectMcp", { server })
@@ -380,6 +389,7 @@ export function createController(getState: () => State, dispatch: (action: Actio
     keepRewind,
     reconnect,
     loadMcp,
+    addMcp,
     setMcpConnected,
     loadPlugins,
     updatePlugins,

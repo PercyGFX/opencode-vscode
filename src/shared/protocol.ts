@@ -115,6 +115,8 @@ export type RequestMap = {
   listMcp: { params: Record<string, never>; result: McpServer[] }
   connectMcp: { params: { server: string }; result: null }
   disconnectMcp: { params: { server: string }; result: null }
+  // Adds one of RECOMMENDED_MCP to the global OpenCode config and connects it.
+  addMcp: { params: { name: string }; result: null }
   listPlugins: { params: { check?: boolean }; result: PluginInfo[] }
   updatePlugins: { params: { targets: string[] }; result: null }
   listSkills: { params: Record<string, never>; result: SkillInfo[] }

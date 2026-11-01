@@ -12,6 +12,7 @@ import {
   type SessionModeMeta,
 } from "../shared/modes.ts"
 import type { ActiveFile, ModelChoice, PastedImage, RequestMap, RequestMethod } from "../shared/protocol.ts"
+import { RECOMMENDED_MCP } from "../shared/recommended-mcp.ts"
 
 export type Handlers = {
   [M in RequestMethod]: (params: RequestMap[M]["params"]) => Promise<RequestMap[M]["result"]>
@@ -29,6 +30,8 @@ export type HandlerDeps = {
   settings: () => Settings
   openFile: (path: string) => Promise<void>
   copyText: (text: string) => Promise<void>
+  // Writes an MCP server to the global OpenCode config (opencode mcp add --global).
+  saveMcp: (name: string, command: readonly string[]) => Promise<void>
   openDiff: (request: RequestMap["openDiff"]["params"]) => Promise<void>
   reconnect: () => Promise<void>
   lastModel: () => ModelChoice | undefined
@@ -306,6 +309,17 @@ export function createHandlers(deps: HandlerDeps): Handlers {
     disconnectMcp: async ({ server }) => {
       const client = await deps.client()
       await client.mcp.disconnect({ server, location: location() })
+      return null
+    },
+
+    // Saved to the config so the TUI and future sessions have it, then added to
+    // the running server so it connects now.
+    addMcp: async ({ name }) => {
+      const entry = RECOMMENDED_MCP.find((candidate) => candidate.name === name)
+      if (!entry) throw new Error(`Unknown MCP server: ${name}`)
+      await deps.saveMcp(entry.name, entry.command)
+      const client = await deps.client()
+      await client.mcp.add({ server: entry.name, location: location(), config: { type: "local", command: entry.command } })
       return null
     },
 

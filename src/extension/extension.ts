@@ -1,4 +1,6 @@
+import { execFile } from "node:child_process"
 import { isAbsolute, join } from "node:path"
+import { promisify } from "node:util"
 import * as vscode from "vscode"
 import { DEFAULT_AUTO_ASK_PATTERNS, isModeId } from "../shared/modes.ts"
 import type { ActiveFile, ModelChoice } from "../shared/protocol.ts"
@@ -7,7 +9,9 @@ import { Connection } from "./connection.ts"
 import { DIFF_SCHEME, DiffDocuments, openDiff, pendingRequest } from "./diff-view.ts"
 import { errorMessage } from "./errors.ts"
 import { createHandlers, type Settings } from "./handlers.ts"
-import { serverDirectory } from "./paths.ts"
+import { resolveOpencodeCommand, serverDirectory } from "./paths.ts"
+
+const execFileAsync = promisify(execFile)
 
 const LAST_MODEL_KEY = "opencode.lastModel"
 const LAST_MODE_KEY = "opencode.lastMode"
@@ -61,6 +65,14 @@ export function activate(context: vscode.ExtensionContext): void {
     openDiff: (request) => openDiff(diffDocuments, directory(), request),
     copyText: async (text) => {
       await vscode.env.clipboard.writeText(text)
+    },
+    saveMcp: async (name, command) => {
+      const opencode = resolveOpencodeCommand(vscode.workspace.getConfiguration("opencode").get<string>("path", ""))
+      log.info(`Adding MCP server ${name}: ${opencode} mcp add --global ${name} -- ${command.join(" ")}`)
+      await execFileAsync(opencode, ["mcp", "add", "--global", name, "--", ...command], {
+        timeout: 30_000,
+        windowsHide: true,
+      })
     },
     reconnect: async () => {
       await connection.reconnect()

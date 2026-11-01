@@ -601,6 +601,96 @@ pre {
   opacity: 1;
 }
 
+.extensions-section {
+  margin-bottom: 4px;
+}
+
+.extensions-section-title {
+  padding: 6px 8px 2px;
+  font-size: 0.8em;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--vscode-descriptionForeground);
+}
+
+/* Browser strip above the composer ------------------------------------------- */
+
+.browser-strip {
+  margin: 0 10px -4px;
+  border: 1px solid var(--vscode-widget-border, var(--vscode-panel-border));
+  border-bottom: none;
+  border-radius: 8px 8px 0 0;
+  background: color-mix(in srgb, var(--vscode-foreground) 4%, var(--vscode-sideBar-background, var(--vscode-editor-background)));
+  font-size: 0.92em;
+  flex-shrink: 0;
+}
+
+.browser-strip-bar {
+  display: flex;
+  align-items: center;
+  padding: 2px 4px 2px 8px;
+}
+
+.browser-strip-toggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: 1;
+  min-width: 0;
+  border: none;
+  background: none;
+  padding: 4px 0;
+  cursor: pointer;
+  text-align: left;
+}
+
+.browser-page {
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.browser-last {
+  color: var(--vscode-descriptionForeground);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1;
+  min-width: 0;
+}
+
+.browser-details {
+  padding: 2px 12px 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.browser-url {
+  color: var(--vscode-textLink-foreground);
+  overflow-wrap: anywhere;
+  font-family: var(--vscode-editor-font-family);
+  font-size: 0.92em;
+}
+
+.browser-meta {
+  color: var(--vscode-descriptionForeground);
+  font-size: 0.92em;
+}
+
+.browser-actions {
+  margin: 2px 0 0;
+  padding-left: 18px;
+  max-height: 140px;
+  overflow-y: auto;
+}
+
+.browser-actions li.running {
+  color: var(--vscode-editorWarning-foreground);
+}
+
 /* Banners ------------------------------------------------------------------ */
 
 .banner {

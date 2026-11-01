@@ -1,5 +1,6 @@
 import { useEffect, useState } from "preact/hooks"
 import type { McpServer, PluginInfo, SkillInfo } from "@opencode/client"
+import { RECOMMENDED_MCP } from "../../shared/recommended-mcp.ts"
 import type { State } from "../store.ts"
 import { Icon } from "./icon.tsx"
 
@@ -9,6 +10,7 @@ type ExtensionsMenuProps = {
   state: State
   onClose: () => void
   onMcp: (server: string, connect: boolean) => Promise<void>
+  onAddMcp: (name: string) => Promise<void>
   onCheckPlugins: () => Promise<void>
   onUpdatePlugin: (target: string) => Promise<void>
   onAttachSkill: (id: string) => void
@@ -54,7 +56,7 @@ export function ExtensionsMenu(props: ExtensionsMenuProps) {
           </button>
         </div>
         <div class="extensions-list">
-          {tab === "mcp" ? <McpTab servers={state.mcp} onMcp={props.onMcp} /> : null}
+          {tab === "mcp" ? <McpTab servers={state.mcp} onMcp={props.onMcp} onAdd={props.onAddMcp} /> : null}
           {tab === "plugins" ? (
             <PluginsTab plugins={state.plugins} onCheck={props.onCheckPlugins} onUpdate={props.onUpdatePlugin} />
           ) : null}
@@ -98,12 +100,45 @@ const MCP_LABELS: Record<McpServer["status"]["status"], string> = {
   needs_auth: "Needs sign-in",
 }
 
-function McpTab({ servers, onMcp }: { servers: McpServer[] | undefined; onMcp: ExtensionsMenuProps["onMcp"] }) {
+function McpTab({
+  servers,
+  onMcp,
+  onAdd,
+}: {
+  servers: McpServer[] | undefined
+  onMcp: ExtensionsMenuProps["onMcp"]
+  onAdd: ExtensionsMenuProps["onAddMcp"]
+}) {
   const { busy, run } = useBusy()
   if (!servers) return <Loading />
-  if (!servers.length) return <Empty text="No MCP servers are configured for this workspace." />
+  const installed = new Set(servers.map((server) => server.name))
+  const recommended = RECOMMENDED_MCP.filter((entry) => !installed.has(entry.name))
   return (
     <>
+      {servers.length ? null : <Empty text="No MCP servers are configured for this workspace." />}
+      {recommended.length ? (
+        <div class="extensions-section">
+          <div class="extensions-section-title">Recommended</div>
+          {recommended.map((entry) => (
+            <div key={entry.name} class="extension-item">
+              <Icon name="globe" />
+              <div class="extension-text">
+                <span class="extension-name">{entry.title}</span>
+                <span class="extension-detail">{entry.description}</span>
+              </div>
+              <button
+                class="button primary small"
+                disabled={busy.has(entry.name)}
+                title="Add to your global OpenCode config and connect"
+                onClick={() => void run(entry.name, () => onAdd(entry.name))}
+              >
+                {busy.has(entry.name) ? <Icon name="loading" spin /> : "Add"}
+              </button>
+            </div>
+          ))}
+        </div>
+      ) : null}
+      {servers.length && recommended.length ? <div class="extensions-section-title">Installed</div> : null}
       {servers.map((server) => {
         const { status } = server.status
         const connected = status === "connected"

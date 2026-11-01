@@ -2,7 +2,7 @@
   "name": "opencode-vscode",
   "displayName": "OpenCode",
   "description": "Chat with OpenCode 2 in VS Code: session tabs that stay in sync with the TUI, permission modes, and effort levels",
-  "version": "0.1.10",
+  "version": "0.1.11",
   "publisher": "percygfx",
   "repository": {
     "type": "git",

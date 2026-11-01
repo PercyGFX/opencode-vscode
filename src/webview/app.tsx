@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useReducer, useRef, useState } from "preact/hooks"
 import { allCommands } from "../shared/commands.ts"
 import { readModeMeta, type ModeId } from "../shared/modes.ts"
+import { browserActivity } from "./browser.ts"
+import { BrowserStrip } from "./components/browser-strip.tsx"
 import { Composer } from "./components/composer.tsx"
 import { Conversation } from "./components/conversation.tsx"
 import { Header, type HeaderMenu } from "./components/header.tsx"
@@ -77,6 +79,10 @@ export function App() {
   const model = resolveModel(state.bootstrap, modelRef)
   const busy = view !== undefined && view.status !== "idle"
   const commands = useMemo(() => allCommands(state.bootstrap?.commands ?? []), [state.bootstrap])
+  const browser = useMemo(() => (view ? browserActivity(view.messages) : undefined), [view?.messages])
+  const browserConnected = Boolean(
+    browser && state.mcp?.some((server) => server.name === browser.server && server.status.status === "connected"),
+  )
   const lastContext = lastContextTokens(view)
   const usage = summarizeUsage({
     ...(view?.info ? { totals: { tokens: view.info.tokens, cost: view.info.cost } } : {}),
@@ -98,6 +104,7 @@ export function App() {
         extensions={{
           onOpen: loadExtensions,
           onMcp: controller.setMcpConnected,
+          onAddMcp: controller.addMcp,
           onCheckPlugins: () => controller.loadPlugins(true),
           onUpdatePlugin: (target) => controller.updatePlugins([target]),
           onAttachSkill: (id) => dispatch({ type: "attachSkill", id }),
@@ -132,6 +139,9 @@ export function App() {
       ) : (
         <EmptyState state={state} />
       )}
+      {browser && tab?.kind === "session" ? (
+        <BrowserStrip key={tab.sessionID} activity={browser} connected={browserConnected} />
+      ) : null}
       <Composer
         disabled={!connected}
         busy={busy}
