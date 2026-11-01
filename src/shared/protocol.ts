@@ -62,6 +62,9 @@ export type LoadedSession = {
 
 export type FormAnswerValue = string | number | boolean | string[]
 
+// An image pasted or dropped into the composer, as a base64 data URL.
+export type PastedImage = { name: string; dataUrl: string }
+
 export type RequestMap = {
   bootstrap: { params: Record<string, never>; result: Bootstrap }
   listSessions: { params: { search?: string }; result: SessionList }
@@ -69,11 +72,18 @@ export type RequestMap = {
   loadMessages: { params: { sessionID: string }; result: SessionMessageInfo[] }
   createSession: { params: { mode: ModeId; model?: ModelChoice }; result: SessionInfo }
   prompt: {
-    params: { sessionID: string; text: string; attachActiveFile: boolean; skills?: string[] }
+    params: { sessionID: string; text: string; attachActiveFile: boolean; skills?: string[]; images?: PastedImage[] }
     result: null
   }
   command: {
-    params: { sessionID: string; name: string; text: string; attachActiveFile: boolean; skills?: string[] }
+    params: {
+      sessionID: string
+      name: string
+      text: string
+      attachActiveFile: boolean
+      skills?: string[]
+      images?: PastedImage[]
+    }
     result: null
   }
   compact: { params: { sessionID: string }; result: null }
@@ -117,4 +127,4 @@ export type HostToWebview =
   | { type: "connection"; state: ConnectionState }
   | { type: "event"; event: OpenCodeEvent }
   | { type: "activeFile"; file: ActiveFile }
-  | { type: "command"; command: "newSession" }
+  | { type: "command"; command: "newSession" | "extensions" }

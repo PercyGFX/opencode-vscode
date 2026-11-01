@@ -2,7 +2,7 @@ import type { OpenCodeEvent } from "@opencode/client"
 import { allCommands, parseSlash } from "../shared/commands.ts"
 import type { FileDiff } from "../shared/diff.ts"
 import type { ModeId } from "../shared/modes.ts"
-import type { FormAnswerValue, ModelChoice } from "../shared/protocol.ts"
+import type { FormAnswerValue, ModelChoice, PastedImage } from "../shared/protocol.ts"
 import { activeTab, type Action, type State } from "./store.ts"
 import { request } from "./vscode.ts"
 
@@ -174,7 +174,7 @@ export function createController(getState: () => State, dispatch: (action: Actio
     return info.id
   }
 
-  const send = async (text: string): Promise<boolean> => {
+  const send = async (text: string, images: PastedImage[] = []): Promise<boolean> => {
     const state = getState()
     const attachActiveFile = state.attachActiveFile && state.activeFile !== undefined
     const slash = parseSlash(text)
@@ -195,11 +195,14 @@ export function createController(getState: () => State, dispatch: (action: Actio
       }
       const sessionID = await ensureSession()
       if (!sessionID) return false
-      const skills = state.pendingSkills.length ? { skills: state.pendingSkills } : {}
+      const extras = {
+        ...(state.pendingSkills.length ? { skills: state.pendingSkills } : {}),
+        ...(images.length ? { images } : {}),
+      }
       if (slash && command) {
-        await request("command", { sessionID, name: command.name, text: slash.args, attachActiveFile, ...skills })
+        await request("command", { sessionID, name: command.name, text: slash.args, attachActiveFile, ...extras })
       } else {
-        await request("prompt", { sessionID, text, attachActiveFile, ...skills })
+        await request("prompt", { sessionID, text, attachActiveFile, ...extras })
       }
       dispatch({ type: "clearSkills" })
       dispatch({ type: "sessionError", sessionID, error: undefined })

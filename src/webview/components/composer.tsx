@@ -2,11 +2,13 @@ import { useEffect, useLayoutEffect, useRef, useState } from "preact/hooks"
 import type { ModelInfo } from "@opencode/client"
 import { matchCommands, type SlashCommand } from "../../shared/commands.ts"
 import { MODES, modeDefinition, nextMode, type ModeId } from "../../shared/modes.ts"
-import type { ActiveFile, ModelChoice } from "../../shared/protocol.ts"
+import type { ActiveFile, ModelChoice, PastedImage } from "../../shared/protocol.ts"
 import { toChoice, variantLabel, type ResolvedModel } from "../models.ts"
 import type { UsageSummary } from "../usage.ts"
 import { Icon } from "./icon.tsx"
 import { ModelMenu } from "./model-menu.tsx"
+
+const MAX_IMAGE_BYTES = 10_000_000
 
 type ComposerProps = {
   disabled: boolean
@@ -23,7 +25,8 @@ type ComposerProps = {
   activeFile: ActiveFile
   attachActiveFile: boolean
   onToggleAttach: () => void
-  onSend: (text: string) => Promise<boolean>
+  onSend: (text: string, images: PastedImage[]) => Promise<boolean>
+  onError: (message: string) => void
   onStop: () => void
   onMode: (mode: ModeId) => void
   onModel: (model: ModelChoice) => void
@@ -36,7 +39,47 @@ export function Composer(props: ComposerProps) {
   const [menu, setMenu] = useState<"mode" | "model" | undefined>(undefined)
   const [highlight, setHighlight] = useState(0)
   const [suggestionsDismissed, setSuggestionsDismissed] = useState(false)
+  const [images, setImages] = useState<Array<PastedImage & { id: number }>>([])
+  const imageCounter = useRef(0)
   const textarea = useRef<HTMLTextAreaElement>(null)
+
+  // Pasted or dropped images, read as data URLs for the prompt.
+  const addImages = (files: File[]) => {
+    for (const file of files) {
+      if (file.size > MAX_IMAGE_BYTES) {
+        props.onError(`${file.name || "That image"} is larger than ${MAX_IMAGE_BYTES / 1_000_000} MB`)
+        continue
+      }
+      const reader = new FileReader()
+      reader.onload = () => {
+        if (typeof reader.result !== "string") return
+        imageCounter.current += 1
+        const id = imageCounter.current
+        const extension = file.type.split("/")[1] ?? "png"
+        const name = file.name && file.name !== "image.png" ? file.name : `image-${id}.${extension}`
+        const dataUrl = reader.result
+        setImages((current) => [...current, { id, name, dataUrl }])
+      }
+      reader.readAsDataURL(file)
+    }
+  }
+
+  const imageFiles = (list: DataTransfer | null) =>
+    Array.from(list?.files ?? []).filter((file) => file.type.startsWith("image/"))
+
+  const onPaste = (event: ClipboardEvent) => {
+    const files = imageFiles(event.clipboardData)
+    if (!files.length) return
+    event.preventDefault()
+    addImages(files)
+  }
+
+  const onDrop = (event: DragEvent) => {
+    const files = imageFiles(event.dataTransfer)
+    if (!files.length) return
+    event.preventDefault()
+    addImages(files)
+  }
 
   const suggestions = suggestionsDismissed ? [] : matchCommands(props.commands, text)
   const highlighted = Math.min(highlight, Math.max(suggestions.length - 1, 0))
@@ -71,14 +114,24 @@ export function Composer(props: ComposerProps) {
     textarea.current?.focus()
   }, [])
 
+  const canSend = Boolean(text.trim() || images.length)
+
   const send = async () => {
     const value = text.trim()
-    if (!value || sending || disabled) return
+    if (!canSend || sending || disabled) return
+    const attached = images
     setSending(true)
     updateText("")
-    const ok = await props.onSend(value)
+    setImages([])
+    const ok = await props.onSend(
+      value,
+      attached.map(({ name, dataUrl }) => ({ name, dataUrl })),
+    )
     setSending(false)
-    if (!ok) updateText(value)
+    if (!ok) {
+      updateText(value)
+      setImages(attached)
+    }
     textarea.current?.focus()
   }
 
@@ -168,7 +221,29 @@ export function Composer(props: ComposerProps) {
           ))}
         </div>
       ) : null}
-      <div class="input-box">
+      <div
+        class="input-box"
+        onDragOver={(event) => {
+          if (event.dataTransfer?.types.includes("Files")) event.preventDefault()
+        }}
+        onDrop={onDrop}
+      >
+        {images.length ? (
+          <div class="attached-images">
+            {images.map((image) => (
+              <span key={image.id} class="image-thumb" title={image.name}>
+                <img src={image.dataUrl} alt={image.name} />
+                <button
+                  class="image-remove"
+                  title="Remove image"
+                  onClick={() => setImages((current) => current.filter((entry) => entry.id !== image.id))}
+                >
+                  <Icon name="close" />
+                </button>
+              </span>
+            ))}
+          </div>
+        ) : null}
         {props.skills.length ? (
           <div class="attached-skills">
             {props.skills.map((skill) => (
@@ -192,6 +267,7 @@ export function Composer(props: ComposerProps) {
           }
           onInput={(event) => updateText(event.currentTarget.value)}
           onKeyDown={onKeyDown}
+          onPaste={onPaste}
         />
         <div class="toolbar">
           <button
@@ -233,7 +309,7 @@ export function Composer(props: ComposerProps) {
               <Icon name="debug-stop" />
             </button>
           ) : null}
-          <button class="icon-button send" title="Send (Enter)" disabled={disabled || sending || !text.trim()} onClick={() => void send()}>
+          <button class="icon-button send" title="Send (Enter)" disabled={disabled || sending || !canSend} onClick={() => void send()}>
             <Icon name={sending ? "loading" : "send"} spin={sending} />
           </button>
         </div>

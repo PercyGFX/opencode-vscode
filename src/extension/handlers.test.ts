@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest"
 import type { SessionInfo, SessionUpdateInput } from "@opencode/client"
 import { META_KEY, modeRules, readModeMeta } from "../shared/modes.ts"
-import { setSessionMode, type ModeClient } from "./handlers.ts"
+import { promptFiles, setSessionMode, type ModeClient } from "./handlers.ts"
 
 const baseSession = (patch: Partial<SessionInfo> = {}): SessionInfo => ({
   id: "ses_1",
@@ -31,6 +31,22 @@ const fakeSessions = (initial: SessionInfo) => {
   }
   return { client, current: () => session }
 }
+
+describe("promptFiles", () => {
+  it("sends pasted images inline next to the current file", () => {
+    const files = promptFiles({ path: "C:\\repo\\a.ts", relativePath: "a.ts" }, [
+      { name: "image.png", dataUrl: "data:image/png;base64,AAAA" },
+    ])
+    expect(files).toEqual([
+      { uri: "file:///C:/repo/a.ts", name: "a.ts" },
+      { uri: "data:image/png;base64,AAAA", name: "image.png", source: { type: "inline" } },
+    ])
+  })
+
+  it("sends nothing when there is nothing to attach", () => {
+    expect(promptFiles(undefined, [])).toBeUndefined()
+  })
+})
 
 describe("setSessionMode", () => {
   it("switches to the plan agent and remembers the previous one", async () => {

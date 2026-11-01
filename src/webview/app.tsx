@@ -1,9 +1,9 @@
-import { useEffect, useMemo, useReducer, useRef } from "preact/hooks"
+import { useEffect, useMemo, useReducer, useRef, useState } from "preact/hooks"
 import { allCommands } from "../shared/commands.ts"
 import { readModeMeta, type ModeId } from "../shared/modes.ts"
 import { Composer } from "./components/composer.tsx"
 import { Conversation } from "./components/conversation.tsx"
-import { Header } from "./components/header.tsx"
+import { Header, type HeaderMenu } from "./components/header.tsx"
 import { Icon } from "./components/icon.tsx"
 import { createController } from "./controller.ts"
 import { resolveModel } from "./models.ts"
@@ -16,6 +16,13 @@ export function App() {
   const stateRef = useRef<State>(state)
   stateRef.current = state
   const controller = useMemo(() => createController(() => stateRef.current, dispatch), [])
+  const [headerMenu, setHeaderMenu] = useState<HeaderMenu | undefined>(undefined)
+
+  const loadExtensions = () => {
+    void controller.loadMcp()
+    void controller.loadPlugins()
+    void controller.loadSkills()
+  }
 
   useEffect(() => {
     const unsubscribe = onHostMessage((message) => {
@@ -27,7 +34,12 @@ export function App() {
           dispatch({ type: "activeFile", file: message.file })
           return
         case "command":
-          dispatch({ type: "newDraft" })
+          if (message.command === "extensions") {
+            loadExtensions()
+            setHeaderMenu("extensions")
+          } else {
+            dispatch({ type: "newDraft" })
+          }
           return
         case "event":
           dispatch({ type: "event", event: message.event })
@@ -81,12 +93,10 @@ export function App() {
         onNew={() => dispatch({ type: "newDraft" })}
         onOpenSession={(sessionID) => dispatch({ type: "openSession", sessionID })}
         onRefreshHistory={() => void controller.refreshHistory()}
+        menu={headerMenu}
+        onMenu={setHeaderMenu}
         extensions={{
-          onOpen: () => {
-            void controller.loadMcp()
-            void controller.loadPlugins()
-            void controller.loadSkills()
-          },
+          onOpen: loadExtensions,
           onMcp: controller.setMcpConnected,
           onCheckPlugins: () => controller.loadPlugins(true),
           onUpdatePlugin: (target) => controller.updatePlugins([target]),
@@ -132,6 +142,7 @@ export function App() {
         attachActiveFile={state.attachActiveFile}
         onToggleAttach={() => dispatch({ type: "toggleAttach" })}
         onSend={controller.send}
+        onError={(text) => dispatch({ type: "notice", text })}
         onStop={() => void controller.stop()}
         onMode={(next) => void controller.setMode(next)}
         onModel={(next) => void controller.setModel(next)}

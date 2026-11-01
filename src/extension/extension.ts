@@ -98,6 +98,7 @@ export function activate(context: vscode.ExtensionContext): void {
     }),
     vscode.commands.registerCommand("opencode.open", () => host.reveal()),
     vscode.commands.registerCommand("opencode.newSession", () => host.newSession()),
+    vscode.commands.registerCommand("opencode.manage", () => host.showExtensions()),
     vscode.commands.registerCommand("opencode.openInTab", () => host.openInTab()),
     vscode.commands.registerCommand("opencode.reconnect", () => connection.reconnect().catch(() => undefined)),
     vscode.workspace.registerTextDocumentContentProvider(DIFF_SCHEME, diffDocuments),

@@ -16,6 +16,7 @@ It connects to the same background server as the OpenCode TUI, so sessions, mess
 - **MCP, plugins and skills** (plug icon): see each MCP server's status and connect or disconnect it, check plugins for errors and updates, and attach skills to your next message.
 - **Slash commands**: type `/` for OpenCode's commands, including your custom ones, plus `/new` and `/compact`.
 - **Current file**: the file and selection you're on are attached to your message. Click the eye chip to leave them out.
+- **Images**: paste or drop images into the composer to send them with your message.
 - **Open in New Tab**: open the chat as an editor tab next to your code.
 
 ## Requirements

@@ -12,7 +12,12 @@ type HeaderProps = {
   onOpenSession: (sessionID: string) => void
   onRefreshHistory: () => void
   extensions: Omit<Parameters<typeof ExtensionsMenu>[0], "state" | "onClose"> & { onOpen: () => void }
+  // Which header menu is open; the app owns it so commands can open a menu too.
+  menu: HeaderMenu | undefined
+  onMenu: (menu: HeaderMenu | undefined) => void
 }
+
+export type HeaderMenu = "history" | "extensions"
 
 export function sessionTitle(info: SessionInfo | undefined): string {
   return info?.title?.trim() || "Untitled session"
@@ -36,8 +41,17 @@ export function relativeTime(timestamp: number, now = Date.now()): string {
   return new Date(timestamp).toLocaleDateString()
 }
 
-export function Header({ state, onActivate, onClose, onNew, onOpenSession, onRefreshHistory, extensions }: HeaderProps) {
-  const [menu, setMenu] = useState<"history" | "extensions" | undefined>(undefined)
+export function Header({
+  state,
+  onActivate,
+  onClose,
+  onNew,
+  onOpenSession,
+  onRefreshHistory,
+  extensions,
+  menu,
+  onMenu: setMenu,
+}: HeaderProps) {
   const historyOpen = menu === "history"
   const { onOpen: onOpenExtensions, ...extensionActions } = extensions
 

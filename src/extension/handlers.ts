@@ -11,7 +11,7 @@ import {
   type ModeId,
   type SessionModeMeta,
 } from "../shared/modes.ts"
-import type { ActiveFile, ModelChoice, RequestMap, RequestMethod } from "../shared/protocol.ts"
+import type { ActiveFile, ModelChoice, PastedImage, RequestMap, RequestMethod } from "../shared/protocol.ts"
 
 export type Handlers = {
   [M in RequestMethod]: (params: RequestMap[M]["params"]) => Promise<RequestMap[M]["result"]>
@@ -90,6 +90,15 @@ const fileAttachment = (file: NonNullable<ActiveFile>) => {
   return { ...attachment, description: `${lines} selected in the editor` }
 }
 
+// The current file (as a file:// link) and pasted images (inline data URLs).
+export function promptFiles(file: ActiveFile, images: readonly PastedImage[] | undefined) {
+  const files = [
+    ...(file ? [fileAttachment(file)] : []),
+    ...(images ?? []).map((image) => ({ uri: image.dataUrl, name: image.name, source: { type: "inline" as const } })),
+  ]
+  return files.length ? files : undefined
+}
+
 export function createHandlers(deps: HandlerDeps): Handlers {
   const location = () => {
     const directory = deps.directory()
@@ -162,26 +171,24 @@ export function createHandlers(deps: HandlerDeps): Handlers {
       })
     },
 
-    prompt: async ({ sessionID, text, attachActiveFile, skills }) => {
+    prompt: async ({ sessionID, text, attachActiveFile, skills, images }) => {
       const client = await deps.client()
-      const file = attachActiveFile ? deps.activeFile() : undefined
       await client.session.prompt({
         sessionID,
         text,
-        files: file ? [fileAttachment(file)] : undefined,
+        files: promptFiles(attachActiveFile ? deps.activeFile() : undefined, images),
         skills: skills?.length ? skills.map((id) => ({ id })) : undefined,
       })
       return null
     },
 
-    command: async ({ sessionID, name, text, attachActiveFile, skills }) => {
+    command: async ({ sessionID, name, text, attachActiveFile, skills, images }) => {
       const client = await deps.client()
-      const file = attachActiveFile ? deps.activeFile() : undefined
       await client.session.command({
         sessionID,
         name,
         text,
-        files: file ? [fileAttachment(file)] : undefined,
+        files: promptFiles(attachActiveFile ? deps.activeFile() : undefined, images),
         skills: skills?.length ? skills.map((id) => ({ id })) : undefined,
       })
       return null

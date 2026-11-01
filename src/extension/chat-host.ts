@@ -97,7 +97,10 @@ export class ChatHost implements vscode.WebviewViewProvider, vscode.Disposable {
       retainContextWhenHidden: true,
       localResourceRoots: [this.dist],
     })
-    panel.iconPath = vscode.Uri.joinPath(this.options.extensionUri, "media", "opencode.svg")
+    panel.iconPath = {
+      light: vscode.Uri.joinPath(this.options.extensionUri, "media", "opencode-light.svg"),
+      dark: vscode.Uri.joinPath(this.options.extensionUri, "media", "opencode-dark.svg"),
+    }
     const surface = this.attach(panel.webview)
     panel.onDidDispose(() => this.detach(surface))
   }
@@ -110,6 +113,11 @@ export class ChatHost implements vscode.WebviewViewProvider, vscode.Disposable {
   async newSession(): Promise<void> {
     await this.reveal()
     this.sidebar?.post({ type: "command", command: "newSession" }, true)
+  }
+
+  async showExtensions(): Promise<void> {
+    await this.reveal()
+    this.sidebar?.post({ type: "command", command: "extensions" }, true)
   }
 
   postActiveFile(): void {
