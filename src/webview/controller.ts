@@ -161,6 +161,9 @@ export function createController(getState: () => State, dispatch: (action: Actio
       case "session.created":
         debounce("history", 300, () => void refreshHistory())
         return
+      case "session.revert.committed":
+        void reloadMessages(event.data.sessionID)
+        return
     }
   }
 
@@ -298,6 +301,43 @@ export function createController(getState: () => State, dispatch: (action: Actio
     }
   }
 
+  // Fork the conversation up to a message into a new tab, with that message ready to edit.
+  const fork = async (sessionID: string, messageID: string, text: string) => {
+    try {
+      const info = await request("forkSession", { sessionID, before: messageID })
+      dispatch({ type: "openSession", sessionID: info.id })
+      dispatch({ type: "prefill", text })
+    } catch (error) {
+      notice(error)
+    }
+  }
+
+  const rewind = async (sessionID: string, messageID: string, text: string, files: boolean) => {
+    try {
+      dispatch({ type: "sessionInfo", info: await request("rewind", { sessionID, messageID, files }) })
+      dispatch({ type: "prefill", text })
+    } catch (error) {
+      notice(error)
+    }
+  }
+
+  const undoRewind = async (sessionID: string) => {
+    try {
+      dispatch({ type: "sessionInfo", info: await request("undoRewind", { sessionID }) })
+    } catch (error) {
+      notice(error)
+    }
+  }
+
+  const keepRewind = async (sessionID: string) => {
+    try {
+      await request("keepRewind", { sessionID })
+      await reloadMessages(sessionID)
+    } catch (error) {
+      notice(error)
+    }
+  }
+
   const openDiff = async (sessionID: string, diff: FileDiff, requestID?: string) => {
     try {
       await request("openDiff", {
@@ -334,6 +374,10 @@ export function createController(getState: () => State, dispatch: (action: Actio
     cancelForm,
     openFile,
     openDiff,
+    fork,
+    rewind,
+    undoRewind,
+    keepRewind,
     reconnect,
     loadMcp,
     setMcpConnected,

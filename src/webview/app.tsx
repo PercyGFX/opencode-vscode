@@ -123,6 +123,11 @@ export function App() {
           onReplyForm={(formID, answer) => void controller.replyForm(tab.sessionID, formID, answer)}
           onCancelForm={(formID) => void controller.cancelForm(tab.sessionID, formID)}
           onDismissError={() => dispatch({ type: "sessionError", sessionID: tab.sessionID, error: undefined })}
+          busy={busy}
+          onFork={(messageID, text) => void controller.fork(tab.sessionID, messageID, text)}
+          onRewind={(messageID, text, files) => void controller.rewind(tab.sessionID, messageID, text, files)}
+          onUndoRewind={() => void controller.undoRewind(tab.sessionID)}
+          onKeepRewind={() => void controller.keepRewind(tab.sessionID)}
         />
       ) : (
         <EmptyState state={state} />
@@ -143,6 +148,7 @@ export function App() {
         onToggleAttach={() => dispatch({ type: "toggleAttach" })}
         onSend={controller.send}
         onError={(text) => dispatch({ type: "notice", text })}
+        prefill={state.prefill}
         onStop={() => void controller.stop()}
         onMode={(next) => void controller.setMode(next)}
         onModel={(next) => void controller.setModel(next)}

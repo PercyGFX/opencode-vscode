@@ -8,7 +8,14 @@ import { contextTokens } from "./usage.ts"
 export type ToolStatus = "streaming" | "running" | "completed" | "error"
 
 export type UiTextPart = { kind: "text"; text: string }
-export type UiReasoningPart = { kind: "reasoning"; text: string; done: boolean }
+export type UiReasoningPart = {
+  kind: "reasoning"
+  text: string
+  done: boolean
+  // When thinking started and finished, for "Thought for 21s".
+  started?: number
+  finished?: number
+}
 export type UiToolPart = {
   kind: "tool"
   id: string
@@ -36,7 +43,8 @@ export type UiAssistantMessage = {
   // Tokens this step put through the model, for the context gauge.
   contextTokens?: number
 }
-export type UiNoteMessage = { kind: "note"; id: string; text: string; tone: "info" | "error" }
+// detail is extra text shown when the note is expanded (system reminders).
+export type UiNoteMessage = { kind: "note"; id: string; text: string; tone: "info" | "error"; detail?: string }
 export type UiShellMessage = { kind: "shell"; id: string; command: string; output: string; status: string }
 export type UiMessage = UiUserMessage | UiAssistantMessage | UiNoteMessage | UiShellMessage
 
@@ -65,7 +73,15 @@ export function toUiMessage(message: SessionMessageInfo): UiMessage | undefined 
       const keys: Record<string, number> = {}
       const parts = message.content.map((part, index): UiPart => {
         if (part.type === "text") return { kind: "text", text: part.text }
-        if (part.type === "reasoning") return { kind: "reasoning", text: part.text, done: true }
+        if (part.type === "reasoning") {
+          return {
+            kind: "reasoning",
+            text: part.text,
+            done: true,
+            ...(part.time ? { started: part.time.created } : {}),
+            ...(part.time?.completed ? { finished: part.time.completed } : {}),
+          }
+        }
         keys[`tool:${part.id}`] = index
         const state = part.state
         const input = typeof state.input === "string" ? {} : state.input
@@ -106,8 +122,14 @@ export function toUiMessage(message: SessionMessageInfo): UiMessage | undefined 
       }
       return message.error ? { ...assistant, error: message.error.message } : assistant
     }
-    case "synthetic":
+    case "synthetic": {
+      // Reminders OpenCode adds for the model (mode changes and the like): show collapsed.
+      const reminder = /^<system-reminder>([\s\S]*?)<\/system-reminder>\s*$/.exec(message.text.trim())
+      if (reminder) {
+        return { kind: "note", id: message.id, text: message.description ?? "System reminder", detail: reminder[1]!.trim(), tone: "info" }
+      }
       return { kind: "note", id: message.id, text: message.description ?? message.text, tone: "info" }
+    }
     case "shell":
       return { kind: "shell", id: message.id, command: message.command, output: message.output?.output ?? "", status: message.status }
     case "agent-switched":

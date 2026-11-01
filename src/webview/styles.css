@@ -636,7 +636,7 @@ pre {
   padding: 12px 12px 4px;
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 12px;
 }
 
 .conversation.empty {
@@ -723,6 +723,68 @@ pre {
   gap: 2px;
 }
 
+.user-meta {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 4px;
+  min-height: 22px;
+}
+
+.user-actions {
+  position: relative;
+  display: inline-flex;
+  visibility: hidden;
+}
+
+.user-block:hover .user-actions,
+.user-actions:has(.pressed) {
+  visibility: visible;
+}
+
+.popover.rewind-menu {
+  top: calc(100% + 4px);
+  right: 0;
+  width: 270px;
+  padding: 4px;
+}
+
+.menu-item {
+  display: block;
+  width: 100%;
+  border: none;
+  background: none;
+  padding: 7px 10px;
+  border-radius: 5px;
+  cursor: pointer;
+  text-align: left;
+}
+
+.menu-item:hover {
+  background: var(--vscode-list-hoverBackground);
+}
+
+.menu-item + .menu-item {
+  border-top: 1px solid var(--vscode-widget-border, transparent);
+}
+
+.card.rewind {
+  border-color: var(--vscode-widget-border, var(--vscode-panel-border));
+}
+
+.rewind-files {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 0.92em;
+}
+
+.rewind-file {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
 .timestamp {
   align-self: flex-end;
   text-align: right;
@@ -732,20 +794,22 @@ pre {
   padding: 2px 0;
 }
 
+/* Inset from the edge like Claude Code: the rail sits inside the column,
+   with breathing room on both sides. */
 .turn {
   position: relative;
   display: flex;
   flex-direction: column;
-  padding-left: 22px;
+  padding: 2px 10px 2px 34px;
 }
 
 /* The rail */
 .turn::before {
   content: "";
   position: absolute;
-  left: 7px;
-  top: 10px;
-  bottom: 10px;
+  left: 14px;
+  top: 14px;
+  bottom: 14px;
   width: 1px;
   background: var(--vscode-widget-border, var(--vscode-panel-border));
 }
@@ -757,14 +821,15 @@ pre {
 
 .row {
   position: relative;
-  padding: 5px 0;
+  padding: 7px 0;
   min-width: 0;
 }
 
+/* Centred on the rail: 14px + 0.5px - 3.5px = 11px from the turn's edge. */
 .row-dot {
   position: absolute;
-  left: -19px;
-  top: calc(5px + 0.55em);
+  left: -23px;
+  top: calc(7px + 0.55em);
   width: 7px;
   height: 7px;
   border-radius: 50%;
@@ -881,8 +946,146 @@ pre {
 }
 
 .io-row:last-child .io-text {
-  background: var(--vscode-textCodeBlock-background);
+  background: color-mix(in srgb, var(--vscode-foreground) 5%, transparent);
   padding-left: 8px;
+}
+
+.note-detail {
+  margin-top: 4px;
+  padding-left: 10px;
+  border-left: 2px solid var(--vscode-widget-border, var(--vscode-panel-border));
+  color: var(--vscode-descriptionForeground);
+  font-size: 0.92em;
+  white-space: pre-wrap;
+}
+
+/* Code blocks in replies ------------------------------------------------------ */
+
+.code-block {
+  margin: 0.6em 0;
+  border: 1px solid var(--vscode-widget-border, var(--vscode-panel-border));
+  border-radius: 6px;
+  overflow: hidden;
+  background: var(--vscode-editor-background);
+}
+
+.code-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 3px 6px 3px 10px;
+  font-size: 0.82em;
+  color: var(--vscode-descriptionForeground);
+  border-bottom: 1px solid var(--vscode-widget-border, var(--vscode-panel-border));
+  background: color-mix(in srgb, var(--vscode-foreground) 4%, transparent);
+}
+
+.code-language {
+  font-family: var(--vscode-editor-font-family);
+}
+
+.code-copy {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  border: none;
+  background: none;
+  padding: 2px 6px;
+  border-radius: 4px;
+  cursor: pointer;
+  color: inherit;
+  font: inherit;
+}
+
+.code-copy:hover {
+  background: var(--vscode-toolbar-hoverBackground);
+  color: var(--vscode-foreground);
+}
+
+.code-copy.copied {
+  color: var(--vscode-testing-iconPassed, #73c991);
+}
+
+.markdown .code-block pre {
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: 0;
+  background: transparent;
+  overflow-x: auto;
+}
+
+.markdown .code-block code {
+  padding: 0;
+  font-size: 0.9em;
+  line-height: 1.5;
+  background: none;
+  color: var(--vscode-editor-foreground);
+}
+
+/* Syntax colours from the theme where VS Code exposes them, with Dark+ fallbacks. */
+.hljs-keyword,
+.hljs-literal,
+.hljs-built_in,
+.hljs-selector-tag,
+.hljs-doctag {
+  color: var(--vscode-debugTokenExpression-boolean, #569cd6);
+}
+
+.hljs-string,
+.hljs-regexp,
+.hljs-template-tag,
+.hljs-addition {
+  color: var(--vscode-debugTokenExpression-string, #ce9178);
+}
+
+.hljs-number,
+.hljs-symbol,
+.hljs-bullet {
+  color: var(--vscode-debugTokenExpression-number, #b5cea8);
+}
+
+.hljs-title,
+.hljs-title.function_,
+.hljs-section {
+  color: var(--vscode-symbolIcon-functionForeground, #dcdcaa);
+}
+
+.hljs-title.class_,
+.hljs-type,
+.hljs-class .hljs-title {
+  color: var(--vscode-symbolIcon-classForeground, #4ec9b0);
+}
+
+.hljs-attr,
+.hljs-attribute,
+.hljs-property,
+.hljs-variable,
+.hljs-params {
+  color: var(--vscode-symbolIcon-variableForeground, #9cdcfe);
+}
+
+.hljs-comment,
+.hljs-quote {
+  color: var(--vscode-descriptionForeground);
+  font-style: italic;
+}
+
+.hljs-meta,
+.hljs-tag,
+.hljs-name {
+  color: var(--vscode-debugTokenExpression-name, #c586c0);
+}
+
+.hljs-deletion {
+  color: var(--vscode-debugTokenExpression-error, #f48771);
+}
+
+.hljs-emphasis {
+  font-style: italic;
+}
+
+.hljs-strong {
+  font-weight: 600;
 }
 
 /* Markdown */
@@ -914,23 +1117,13 @@ pre {
   color: var(--vscode-textLink-foreground);
 }
 
+/* Inline code: subtle chip in the normal text colour (VS Code defaults it to orange). */
 .markdown code {
-  padding: 1px 4px;
-  border-radius: 3px;
-  font-size: 0.9em;
-  background: var(--vscode-textCodeBlock-background);
-}
-
-.markdown pre {
-  padding: 8px 10px;
-  border-radius: 6px;
-  overflow-x: auto;
-  background: var(--vscode-textCodeBlock-background);
-}
-
-.markdown pre code {
-  padding: 0;
-  background: none;
+  padding: 1px 5px;
+  border-radius: 4px;
+  font-size: 0.88em;
+  color: var(--vscode-foreground);
+  background: color-mix(in srgb, var(--vscode-foreground) 10%, transparent);
 }
 
 .markdown blockquote {

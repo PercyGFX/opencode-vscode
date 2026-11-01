@@ -60,6 +60,8 @@ export type State = {
   skills?: SkillInfo[]
   // Skills attached to the next message.
   pendingSkills: string[]
+  // Text to put back in the composer (after a rewind or fork); id changes each time.
+  prefill?: { id: number; text: string }
   notice?: string
 }
 
@@ -94,6 +96,7 @@ export type Action =
   | { type: "attachSkill"; id: string }
   | { type: "detachSkill"; id: string }
   | { type: "clearSkills" }
+  | { type: "prefill"; text: string }
 
 const draftTab = (counter: number, mode: ModeId, model?: ModelChoice): DraftTab => ({
   kind: "draft",
@@ -366,7 +369,7 @@ export function applyEvent(state: State, event: OpenCodeEvent): State {
     case "session.reasoning.started": {
       const { sessionID, assistantMessageID, ordinal } = event.data
       return updateAssistant(state, sessionID, assistantMessageID, (message) =>
-        addPart(message, `reasoning:${ordinal}`, { kind: "reasoning", text: "", done: false }),
+        addPart(message, `reasoning:${ordinal}`, { kind: "reasoning", text: "", done: false, started: event.created }),
       )
     }
     case "session.reasoning.delta": {
@@ -377,9 +380,12 @@ export function applyEvent(state: State, event: OpenCodeEvent): State {
     }
     case "session.reasoning.ended": {
       const { sessionID, assistantMessageID, ordinal, text } = event.data
-      return updateAssistant(state, sessionID, assistantMessageID, (message) =>
-        streamText(message, `reasoning:${ordinal}`, "reasoning", () => text, true),
-      )
+      return updateAssistant(state, sessionID, assistantMessageID, (message) => {
+        const next = streamText(message, `reasoning:${ordinal}`, "reasoning", () => text, true)
+        const index = next.keys[`reasoning:${ordinal}`]
+        const part = index === undefined ? undefined : next.parts[index]
+        return part?.kind === "reasoning" ? replacePart(next, index!, { ...part, finished: event.created }) : next
+      })
     }
     case "session.tool.input.started": {
       const { sessionID, assistantMessageID, id, name } = event.data
@@ -477,6 +483,11 @@ export function applyEvent(state: State, event: OpenCodeEvent): State {
       return patchInfo(state, event.data.sessionID, (info) => ({ ...info, metadata: event.data.metadata }))
     case "session.renamed":
       return patchInfo(state, event.data.sessionID, (info) => ({ ...info, title: event.data.title }))
+    case "session.revert.staged":
+      return patchInfo(state, event.data.sessionID, (info) => ({ ...info, revert: event.data.revert }))
+    case "session.revert.cleared":
+    case "session.revert.committed":
+      return patchInfo(state, event.data.sessionID, ({ revert: _revert, ...info }) => info)
     case "session.deleted":
     case "session.archived":
       return removeSessionEverywhere(state, event.data.sessionID)
@@ -674,5 +685,8 @@ export function reducer(state: State, action: Action): State {
 
     case "clearSkills":
       return state.pendingSkills.length ? { ...state, pendingSkills: [] } : state
+
+    case "prefill":
+      return { ...state, prefill: { id: (state.prefill?.id ?? 0) + 1, text: action.text } }
   }
 }

@@ -91,6 +91,10 @@ export type RequestMap = {
   setMode: { params: { sessionID: string; mode: ModeId }; result: SessionInfo }
   setModel: { params: { sessionID: string; model: ModelChoice }; result: SessionInfo }
   remember: { params: { model?: ModelChoice; mode?: ModeId }; result: null }
+  forkSession: { params: { sessionID: string; before: string }; result: SessionInfo }
+  rewind: { params: { sessionID: string; messageID: string; files: boolean }; result: SessionInfo }
+  undoRewind: { params: { sessionID: string }; result: SessionInfo }
+  keepRewind: { params: { sessionID: string }; result: null }
   replyPermission: {
     params: { sessionID: string; requestID: string; decision: "once" | "always" | "reject" }
     result: null
@@ -102,6 +106,7 @@ export type RequestMap = {
   cancelForm: { params: { sessionID: string; formID: string }; result: null }
   getForm: { params: { sessionID: string; formID: string }; result: FormDetail }
   openFile: { params: { path: string }; result: null }
+  copyText: { params: { text: string }; result: null }
   openDiff: {
     params: { file: string; patch: string; status: FileDiffStatus; sessionID?: string; requestID?: string }
     result: null

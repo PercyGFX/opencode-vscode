@@ -28,6 +28,8 @@ type ComposerProps = {
   onSend: (text: string, images: PastedImage[]) => Promise<boolean>
   onError: (message: string) => void
   onStop: () => void
+  // Text to load into the input, e.g. the message being rewound; id changes per request.
+  prefill?: { id: number; text: string }
   onMode: (mode: ModeId) => void
   onModel: (model: ModelChoice) => void
 }
@@ -113,6 +115,12 @@ export function Composer(props: ComposerProps) {
   useEffect(() => {
     textarea.current?.focus()
   }, [])
+
+  useEffect(() => {
+    if (!props.prefill) return
+    updateText(props.prefill.text)
+    textarea.current?.focus()
+  }, [props.prefill?.id])
 
   const canSend = Boolean(text.trim() || images.length)
 

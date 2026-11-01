@@ -12,6 +12,7 @@ import {
   type UiUserMessage,
 } from "../messages.ts"
 import type { SessionView } from "../store.ts"
+import { request } from "../vscode.ts"
 import { FormCard, PermissionCard } from "./cards.tsx"
 import { DiffView } from "./diff.tsx"
 import { Icon } from "./icon.tsx"
@@ -26,6 +27,11 @@ type ConversationProps = {
   onReplyForm: (formID: string, answer: Record<string, FormAnswerValue>) => void
   onCancelForm: (formID: string) => void
   onDismissError: () => void
+  busy: boolean
+  onFork: (messageID: string, text: string) => void
+  onRewind: (messageID: string, text: string, files: boolean) => void
+  onUndoRewind: () => void
+  onKeepRewind: () => void
 }
 
 // A user prompt, or everything OpenCode did in reply to it (drawn as one timeline).
@@ -56,6 +62,11 @@ export function Conversation({
   onReplyForm,
   onCancelForm,
   onDismissError,
+  busy,
+  onFork,
+  onRewind,
+  onUndoRewind,
+  onKeepRewind,
 }: ConversationProps) {
   const scroller = useRef<HTMLDivElement>(null)
   const stick = useRef(true)
@@ -72,7 +83,14 @@ export function Conversation({
     if (element) stick.current = element.scrollHeight - element.scrollTop - element.clientHeight < 80
   }
 
-  const blocks = useMemo(() => groupBlocks(view.messages), [view.messages])
+  // While a rewind is staged, messages from the rewind point on are hidden.
+  const revert = view.info?.revert
+  const revertIndex = revert ? view.messages.findIndex((message) => message.id === revert.messageID) : -1
+  const shown = useMemo(
+    () => (revertIndex >= 0 ? view.messages.slice(0, revertIndex) : view.messages),
+    [view.messages, revertIndex],
+  )
+  const blocks = useMemo(() => groupBlocks(shown), [shown])
   const lastAssistant = view.messages.findLast((message) => message.kind === "assistant")
   const working = view.status !== "idle" && (!lastAssistant || lastAssistant.kind !== "assistant" || lastAssistant.done)
   const workingLabel = view.status === "retry" ? (view.retryMessage ?? "Retrying…") : "Working…"
@@ -87,7 +105,13 @@ export function Conversation({
       ) : null}
       {blocks.map((block) =>
         block.kind === "user" ? (
-          <UserMessage key={block.message.id} message={block.message} />
+          <UserMessage
+            key={block.message.id}
+            message={block.message}
+            actionsDisabled={busy}
+            onFork={() => onFork(block.message.id, block.message.text)}
+            onRewind={(files) => onRewind(block.message.id, block.message.text, files)}
+          />
         ) : (
           <Turn
             key={block.key}
@@ -98,6 +122,14 @@ export function Conversation({
         ),
       )}
       {working && lastBlock?.kind !== "turn" ? <Turn messages={[]} working={workingLabel} onOpenFile={onOpenFile} /> : null}
+      {revert && revertIndex >= 0 ? (
+        <RewindBanner
+          hidden={view.messages.length - revertIndex}
+          files={revert.files ?? []}
+          onUndo={onUndoRewind}
+          onKeep={onKeepRewind}
+        />
+      ) : null}
       {view.error ? (
         <div class="banner error">
           <Icon name="error" />
@@ -127,10 +159,101 @@ export function Conversation({
   )
 }
 
-function UserMessage({ message }: { message: UiUserMessage }) {
+function RewindBanner({
+  hidden,
+  files,
+  onUndo,
+  onKeep,
+}: {
+  hidden: number
+  files: Array<{ file: string; additions: number; deletions: number }>
+  onUndo: () => void
+  onKeep: () => void
+}) {
+  return (
+    <div class="card rewind">
+      <div class="card-title">
+        <Icon name="history" />
+        <span>
+          Rewound {hidden} message{hidden === 1 ? "" : "s"}
+          {files.length ? ` and ${files.length} file${files.length === 1 ? "" : "s"}` : ""}
+        </span>
+      </div>
+      {files.length ? (
+        <div class="rewind-files">
+          {files.map((file) => (
+            <div key={file.file} class="rewind-file">
+              <span class="diff-file">{file.file}</span>
+              <span class="diff-stats">
+                <span class="diff-additions">+{file.additions}</span>
+                <span class="diff-deletions">-{file.deletions}</span>
+              </span>
+            </div>
+          ))}
+        </div>
+      ) : null}
+      <div class="card-message">Edit your message and send it to continue from here, or undo the rewind.</div>
+      <div class="card-actions">
+        <button class="button secondary" onClick={onUndo}>
+          Undo
+        </button>
+        <button class="button secondary" title="Delete the rewound messages for good" onClick={onKeep}>
+          Keep
+        </button>
+      </div>
+    </div>
+  )
+}
+
+function UserMessage({
+  message,
+  actionsDisabled,
+  onFork,
+  onRewind,
+}: {
+  message: UiUserMessage
+  actionsDisabled: boolean
+  onFork: () => void
+  onRewind: (files: boolean) => void
+}) {
+  const [menuOpen, setMenuOpen] = useState(false)
+  const pick = (action: () => void) => {
+    setMenuOpen(false)
+    action()
+  }
   return (
     <div class="user-block">
-      <div class="timestamp">{formatTime(message.created)}</div>
+      <div class="user-meta">
+        <span class="timestamp">{formatTime(message.created)}</span>
+        {message.pending ? null : (
+          <span class="user-actions">
+            <button
+              class={`icon-button${menuOpen ? " pressed" : ""}`}
+              title={actionsDisabled ? "Wait for OpenCode to finish" : "Fork or rewind from this message"}
+              disabled={actionsDisabled}
+              onClick={() => setMenuOpen(!menuOpen)}
+            >
+              <Icon name="discard" />
+            </button>
+            {menuOpen ? (
+              <>
+                <div class="backdrop" onClick={() => setMenuOpen(false)} />
+                <div class="popover rewind-menu">
+                  <button class="menu-item" onClick={() => pick(onFork)}>
+                    Fork conversation from here
+                  </button>
+                  <button class="menu-item" onClick={() => pick(() => onRewind(true))}>
+                    Rewind conversation and code to here
+                  </button>
+                  <button class="menu-item" onClick={() => pick(() => onRewind(false))}>
+                    Rewind conversation only
+                  </button>
+                </div>
+              </>
+            ) : null}
+          </span>
+        )}
+      </div>
       <div class={`message user${message.pending ? " pending" : ""}`}>
         <div class="user-text">{message.text}</div>
         {message.files.length ? (
@@ -197,11 +320,7 @@ function TurnMessage({ message, onOpenFile }: { message: UiMessage; onOpenFile: 
     case "assistant":
       return <AssistantRows message={message} onOpenFile={onOpenFile} />
     case "note":
-      return (
-        <Row dot={message.tone === "error" ? "error" : "note"}>
-          <span class={message.tone === "error" ? "error-text" : "muted"}>{message.text}</span>
-        </Row>
-      )
+      return <NoteRow text={message.text} detail={message.detail} error={message.tone === "error"} />
     case "shell":
       return <ShellRow message={message} />
     case "user":
@@ -220,7 +339,11 @@ function AssistantRows({ message, onOpenFile }: { message: UiAssistantMessage; o
             </Row>
           ) : null
         }
-        if (part.kind === "reasoning") return part.text.trim() ? <Thinking key={index} text={part.text} done={part.done} /> : null
+        if (part.kind === "reasoning") {
+          return part.text.trim() ? (
+            <Thinking key={index} text={part.text} done={part.done} started={part.started} finished={part.finished} />
+          ) : null
+        }
         return <ToolRow key={part.id} part={part} onOpenFile={onOpenFile} />
       })}
       {message.error ? (
@@ -232,20 +355,65 @@ function AssistantRows({ message, onOpenFile }: { message: UiAssistantMessage; o
   )
 }
 
-function Markdown({ text }: { text: string }) {
-  const html = useMemo(() => renderMarkdown(text), [text])
-  return <div class="markdown" dangerouslySetInnerHTML={{ __html: html }} />
+// Copy buttons live in the rendered HTML, so handle their clicks here.
+const onMarkdownClick = (event: MouseEvent) => {
+  const button = (event.target as HTMLElement | null)?.closest<HTMLButtonElement>(".code-copy")
+  const code = button?.closest(".code-block")?.querySelector("code")?.textContent
+  if (!button || code === undefined || code === null) return
+  request("copyText", { text: code })
+    .then(() => {
+      button.classList.add("copied")
+      const label = button.querySelector("span")
+      if (label) label.textContent = "Copied"
+      setTimeout(() => {
+        button.classList.remove("copied")
+        if (label) label.textContent = "Copy"
+      }, 1500)
+    })
+    .catch(() => undefined)
 }
 
-function Thinking({ text, done }: { text: string; done: boolean }) {
+function Markdown({ text }: { text: string }) {
+  const html = useMemo(() => renderMarkdown(text), [text])
+  return <div class="markdown" onClick={onMarkdownClick} dangerouslySetInnerHTML={{ __html: html }} />
+}
+
+const thinkingLabel = (done: boolean, started?: number, finished?: number) => {
+  if (!done) return "Thinking…"
+  if (started === undefined || finished === undefined) return "Thought"
+  const seconds = Math.max(1, Math.round((finished - started) / 1000))
+  return seconds < 60 ? `Thought for ${seconds}s` : `Thought for ${Math.floor(seconds / 60)}m ${seconds % 60}s`
+}
+
+function Thinking({ text, done, started, finished }: { text: string; done: boolean; started?: number; finished?: number }) {
   const [open, setOpen] = useState(false)
   return (
     <Row dot="thinking">
       <button class="row-toggle muted" onClick={() => setOpen(!open)}>
-        {done ? "Thinking" : "Thinking…"}
-        <Icon name={open ? "chevron-up" : "chevron-down"} />
+        {thinkingLabel(done, started, finished)}
+        <Icon name={open ? "chevron-up" : "chevron-right"} />
       </button>
       {open ? <Markdown text={text} /> : null}
+    </Row>
+  )
+}
+
+function NoteRow({ text, detail, error }: { text: string; detail?: string; error: boolean }) {
+  const [open, setOpen] = useState(false)
+  if (!detail) {
+    return (
+      <Row dot={error ? "error" : "note"}>
+        <span class={error ? "error-text" : "muted"}>{text}</span>
+      </Row>
+    )
+  }
+  return (
+    <Row dot="note">
+      <button class="row-toggle muted note-toggle" onClick={() => setOpen(!open)}>
+        {text}
+        <Icon name={open ? "chevron-up" : "chevron-right"} />
+      </button>
+      {open ? <div class="note-detail">{detail}</div> : null}
     </Row>
   )
 }

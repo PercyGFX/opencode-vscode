@@ -59,6 +59,9 @@ export function activate(context: vscode.ExtensionContext): void {
       await vscode.window.showTextDocument(vscode.Uri.file(absolute), { preview: true })
     },
     openDiff: (request) => openDiff(diffDocuments, directory(), request),
+    copyText: async (text) => {
+      await vscode.env.clipboard.writeText(text)
+    },
     reconnect: async () => {
       await connection.reconnect()
     },

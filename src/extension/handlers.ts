@@ -28,6 +28,7 @@ export type HandlerDeps = {
   activeFile: () => ActiveFile
   settings: () => Settings
   openFile: (path: string) => Promise<void>
+  copyText: (text: string) => Promise<void>
   openDiff: (request: RequestMap["openDiff"]["params"]) => Promise<void>
   reconnect: () => Promise<void>
   lastModel: () => ModelChoice | undefined
@@ -222,6 +223,32 @@ export function createHandlers(deps: HandlerDeps): Handlers {
       return null
     },
 
+    // A new session with the conversation up to (not including) the message.
+    forkSession: async ({ sessionID, before }) => {
+      const client = await deps.client()
+      return client.session.fork({ sessionID, before })
+    },
+
+    // Stages a revert to just before the message: later messages are hidden, and
+    // with files the workspace goes back to how it was. Undo or keep it after.
+    rewind: async ({ sessionID, messageID, files }) => {
+      const client = await deps.client()
+      await client.session.revert.stage({ sessionID, messageID, files })
+      return client.session.get({ sessionID })
+    },
+
+    undoRewind: async ({ sessionID }) => {
+      const client = await deps.client()
+      await client.session.revert.clear({ sessionID })
+      return client.session.get({ sessionID })
+    },
+
+    keepRewind: async ({ sessionID }) => {
+      const client = await deps.client()
+      await client.session.revert.commit({ sessionID })
+      return null
+    },
+
     replyPermission: async ({ sessionID, requestID, decision }) => {
       const client = await deps.client()
       await client.permission.reply({ sessionID, requestID, decision })
@@ -252,6 +279,11 @@ export function createHandlers(deps: HandlerDeps): Handlers {
 
     openDiff: async (request) => {
       await deps.openDiff(request)
+      return null
+    },
+
+    copyText: async ({ text }) => {
+      await deps.copyText(text)
       return null
     },
 

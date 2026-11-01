@@ -17,6 +17,8 @@ It connects to the same background server as the OpenCode TUI, so sessions, mess
 - **Slash commands**: type `/` for OpenCode's commands, including your custom ones, plus `/new` and `/compact`.
 - **Current file**: the file and selection you're on are attached to your message. Click the eye chip to leave them out.
 - **Images**: paste or drop images into the composer to send them with your message.
+- **Fork and rewind**: the ↺ button on any of your messages forks the conversation from there, or rewinds the conversation (and optionally your files) to it, with undo.
+- **Readable replies**: a Claude Code-style timeline, syntax-highlighted code blocks with a copy button, and how long the model thought.
 - **Open in New Tab**: open the chat as an editor tab next to your code.
 
 ## Requirements

@@ -222,6 +222,40 @@ describe("remembered model and mode", () => {
   })
 })
 
+describe("rewind", () => {
+  it("tracks a staged rewind until it is cleared", () => {
+    const staged = apply(
+      withSession(),
+      event("session.revert.staged", { sessionID: "ses_1", revert: { messageID: "msg_u" } }),
+    )
+    expect(staged.sessions.ses_1!.info?.revert?.messageID).toBe("msg_u")
+    const cleared = apply(staged, event("session.revert.cleared", { sessionID: "ses_1" }))
+    expect(cleared.sessions.ses_1!.info?.revert).toBeUndefined()
+  })
+
+  it("loads text back into the composer each time", () => {
+    const first = reducer(initialState(undefined), { type: "prefill", text: "fix it" })
+    const second = reducer(first, { type: "prefill", text: "fix it" })
+    expect(second.prefill).toEqual({ id: 2, text: "fix it" })
+  })
+})
+
+describe("system reminders", () => {
+  it("collapses reminders OpenCode adds for the model", () => {
+    const loaded = withSession("ses_1", [
+      {
+        id: "msg_s",
+        type: "synthetic",
+        time: { created: 1 },
+        text: "<system-reminder>\nYou are no longer in Plan mode.\n</system-reminder>",
+      },
+    ])
+    expect(loaded.sessions.ses_1!.messages).toEqual([
+      { kind: "note", id: "msg_s", text: "System reminder", detail: "You are no longer in Plan mode.", tone: "info" },
+    ])
+  })
+})
+
 describe("skills", () => {
   it("attaches skills once and clears them after sending", () => {
     let state = reducer(initialState(undefined), { type: "attachSkill", id: "review" })
