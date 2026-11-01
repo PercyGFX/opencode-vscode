@@ -1,6 +1,8 @@
-# OpenCode for VS Code
+# OpenCode Chat for VS Code (Unofficial)
 
 A chat panel for [OpenCode 2](https://opencode.ai) that sits in VS Code's secondary side bar, like Claude Code or Copilot Chat.
+
+> This is a community extension. It isn't made by or affiliated with the OpenCode team.
 
 It connects to the same background server as the OpenCode TUI, so sessions, messages and permission prompts stay in sync between the two. Your OpenCode providers, plugins, MCP servers, skills and agents all work, because they run in that server.
 

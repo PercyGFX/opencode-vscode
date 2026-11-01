@@ -1,9 +1,15 @@
 {
   "name": "opencode-vscode",
-  "displayName": "OpenCode",
-  "description": "Chat with OpenCode 2 in VS Code: session tabs that stay in sync with the TUI, permission modes, and effort levels",
-  "version": "0.1.13",
+  "displayName": "OpenCode Chat (Unofficial)",
+  "description": "A Claude Code-style chat panel for OpenCode 2: sessions synced with the TUI, permission modes, diffs, MCP and browser control",
+  "version": "1.0.0",
   "publisher": "percygfx",
+  "license": "MIT",
+  "icon": "media/icon.png",
+  "homepage": "https://github.com/PercyGFX/opencode-vscode#readme",
+  "bugs": {
+    "url": "https://github.com/PercyGFX/opencode-vscode/issues"
+  },
   "repository": {
     "type": "git",
     "url": "https://github.com/PercyGFX/opencode-vscode.git"
