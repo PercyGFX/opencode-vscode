@@ -1,5 +1,5 @@
 {
-  "name": "opencode-chat",
+  "name": "percygfx-opencode-chat",
   "displayName": "OpenCode Chat (Unofficial)",
   "description": "A Claude Code-style chat panel for OpenCode 2: sessions synced with the TUI, permission modes, diffs, MCP and browser control",
   "version": "1.0.0",
