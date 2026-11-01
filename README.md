@@ -13,7 +13,7 @@ It connects to the same background server as the OpenCode TUI, so sessions, mess
 - **Model picker**: switch the session's model from the composer.
 - **Permission prompts and questions**: approve edits and commands, and answer the agent's questions, inline.
 - **Diffs**: edit prompts show the change; **Open diff** opens it in VS Code's diff editor, where ✓ and ✕ accept or reject it.
-- **MCP, plugins and skills** (plug icon): see each MCP server's status and connect or disconnect it, check plugins for errors and updates, and attach skills to your next message. Recommended servers, such as Chrome DevTools for browser control, can be added in one click.
+- **MCP, plugins and skills** (plug icon): see each MCP server's status and connect or disconnect it, check plugins for errors and updates, and attach skills to your next message. Recommended servers, such as Chrome DevTools for browser control, can be added in one click. Chrome DevTools attaches to the Chrome you already have open: turn on remote debugging once at `chrome://inspect/#remote-debugging` (Chrome 144 or newer).
 - **Browser activity**: when OpenCode drives a browser (Chrome DevTools or Playwright MCP), a strip above the composer shows the page it's on and what it last did, and expands to list recent actions and console counts.
 - **Slash commands**: type `/` for OpenCode's commands, including your custom ones, plus `/new` and `/compact`.
 - **Current file**: the file and selection you're on are attached to your message. Click the eye chip to leave them out.

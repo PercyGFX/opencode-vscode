@@ -64,6 +64,23 @@ export function App() {
     savePersisted(persistable(state))
   }, [state.tabs, state.activeKey, state.attachActiveFile])
 
+  // Esc stops OpenCode from anywhere in the panel, like Claude Code. Open menus
+  // handle Esc themselves (closing), so leave it to them.
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key !== "Escape" || event.defaultPrevented) return
+      if (document.querySelector(".popover")) return
+      const current = stateRef.current
+      const active = activeTab(current)
+      if (active?.kind !== "session") return
+      if ((current.sessions[active.sessionID]?.status ?? "idle") === "idle") return
+      event.preventDefault()
+      void controller.stop()
+    }
+    window.addEventListener("keydown", onKey)
+    return () => window.removeEventListener("keydown", onKey)
+  }, [controller])
+
   // Load tabs that were restored or opened from history.
   useEffect(() => {
     if (!connected) return

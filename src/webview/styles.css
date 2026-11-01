@@ -491,6 +491,13 @@ pre {
   overflow-wrap: anywhere;
 }
 
+.extension-hint {
+  margin-top: 2px;
+  font-size: 0.88em;
+  color: var(--vscode-editorWarning-foreground);
+  overflow-wrap: anywhere;
+}
+
 .extensions-builtin > summary {
   cursor: pointer;
   padding: 6px 8px;

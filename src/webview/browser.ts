@@ -105,6 +105,26 @@ export function browserActivity(messages: readonly UiMessage[]): BrowserActivity
   return activity
 }
 
+const TOOL_SEARCH = /search\(\s*\{\s*namespace:\s*["'`]([\w-]+)["'`]/
+
+// A readable label for a code-tool call that drives the browser or looks up
+// tools, instead of its first line of code.
+export function describeCodeCall(part: UiToolPart): { label: string; summary: string } | undefined {
+  const calls = browserCalls(part)
+  if (calls.length) {
+    const url = lastMatch(`${part.output}`, /Page URL:\s*(\S+)/g) ?? lastMatch(String(part.input.code ?? ""), /url:\s*["'`](https?:\/\/[^"'`]+)["'`]/g)
+    const labels = calls.map(([, tool]) => {
+      const label = actionLabel(tool)
+      return label === "Opened a page" && url ? `Opened ${hostOf(url)}` : label
+    })
+    return { label: "Browser", summary: [...new Set(labels)].join(", ") }
+  }
+  const code = typeof part.input.code === "string" ? part.input.code : ""
+  const search = TOOL_SEARCH.exec(code)
+  if (search) return { label: "Tools", summary: `Looked up ${search[1]} tools` }
+  return undefined
+}
+
 export function browserPageLabel(activity: BrowserActivity): string {
   if (activity.title) return activity.title
   if (activity.url) return hostOf(activity.url)

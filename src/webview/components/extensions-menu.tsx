@@ -92,6 +92,8 @@ function useBusy() {
   return { busy, run }
 }
 
+const setupHints = new Map(RECOMMENDED_MCP.flatMap((entry) => (entry.setupHint ? [[entry.name, entry.setupHint]] : [])))
+
 const MCP_LABELS: Record<McpServer["status"]["status"], string> = {
   connected: "Connected",
   pending: "Connecting…",
@@ -152,6 +154,9 @@ function McpTab({
                 {MCP_LABELS[status]}
                 {"error" in server.status ? ` · ${server.status.error}` : ""}
               </span>
+              {status === "failed" && setupHints.get(server.name) ? (
+                <span class="extension-hint">{setupHints.get(server.name)}</span>
+              ) : null}
             </div>
             <button
               class="button secondary small"

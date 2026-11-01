@@ -2,6 +2,7 @@ import { useLayoutEffect, useMemo, useRef, useState } from "preact/hooks"
 import type { ComponentChildren } from "preact"
 import type { FileDiff } from "../../shared/diff.ts"
 import type { FormAnswerValue } from "../../shared/protocol.ts"
+import { describeCodeCall } from "../browser.ts"
 import { renderMarkdown } from "../markdown.ts"
 import {
   toolSummary,
@@ -469,7 +470,9 @@ function ToolRow({ part, onOpenFile }: { part: UiToolPart; onOpenFile: (path: st
   const [open, setOpen] = useState(isShell)
   const dot: DotKind = part.status === "error" ? "error" : part.status
   const command = isShell ? stringInput(part, "command") : undefined
-  const summary = isShell ? (stringInput(part, "description") ?? command ?? "") : toolSummary(part)
+  // Browser and tool-lookup calls made through the code tool read better by what they did.
+  const described = isShell ? undefined : describeCodeCall(part)
+  const summary = isShell ? (stringInput(part, "description") ?? command ?? "") : (described?.summary ?? toolSummary(part))
   const filePath = isShell ? undefined : filePathOf(part)
   const input = JSON.stringify(part.input, null, 2)
   const hasDetails = Boolean(part.diffs?.length || part.output || part.error || input !== "{}")
@@ -478,7 +481,7 @@ function ToolRow({ part, onOpenFile }: { part: UiToolPart; onOpenFile: (path: st
     <Row dot={dot}>
       <div class="tool-heading">
         <button class="row-toggle" disabled={!hasDetails} onClick={() => setOpen(!open)}>
-          <span class="tool-name">{toolLabel(part.name)}</span>
+          <span class="tool-name">{described?.label ?? toolLabel(part.name)}</span>
         </button>
         {filePath ? (
           <a

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import { browserActivity, browserPageLabel } from "./browser.ts"
+import { browserActivity, browserPageLabel, describeCodeCall } from "./browser.ts"
 import type { UiMessage, UiToolPart } from "./messages.ts"
 
 const assistant = (...parts: UiToolPart[]): UiMessage => ({
@@ -30,6 +30,28 @@ await page.goto('https://www.google.com');
 - Page URL: https://www.google.com/
 - Page Title: Google
 - Console: 13 errors, 0 warnings`
+
+describe("describeCodeCall", () => {
+  it("names browser calls by what they did", () => {
+    expect(
+      describeCodeCall(execute('const logs = await tools["chrome-devtools"].list_console_messages({})', "")),
+    ).toEqual({ label: "Browser", summary: "Read console logs" })
+    expect(
+      describeCodeCall(execute('await tools.playwright.browser_navigate({ url: "https://www.google.com" })', navigateOutput)),
+    ).toEqual({ label: "Browser", summary: "Opened www.google.com" })
+  })
+
+  it("names tool lookups", () => {
+    expect(describeCodeCall(execute('const res = search({ namespace: "chrome-devtools", query: "console" })', ""))).toEqual({
+      label: "Tools",
+      summary: "Looked up chrome-devtools tools",
+    })
+  })
+
+  it("leaves other code alone", () => {
+    expect(describeCodeCall(execute("const logSnapshots = []", ""))).toBeUndefined()
+  })
+})
 
 describe("browserActivity", () => {
   it("reads the page, title and console from Playwright output", () => {
