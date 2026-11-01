@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import type { ModelInfo, OpenCodeEvent, SessionInfo, SessionMessageInfo } from "@opencode/client"
+import type { ModelInfo, OpenCodeEvent, SessionInfo, SessionMessageInfo, SkillInfo } from "@opencode/client"
 import type { ModeId } from "../shared/modes.ts"
 import type { ModelChoice } from "../shared/protocol.ts"
 import { initialState, lastContextTokens, persistable, reducer, type State } from "./store.ts"
@@ -219,6 +219,26 @@ describe("remembered model and mode", () => {
       bootstrap: bootstrap({ providerID: "p", id: "fast", variant: "max" }, null),
     })
     expect(staleEffort.lastModel).toEqual({ providerID: "p", id: "fast" })
+  })
+})
+
+describe("skills", () => {
+  it("attaches skills once and clears them after sending", () => {
+    let state = reducer(initialState(undefined), { type: "attachSkill", id: "review" })
+    state = reducer(state, { type: "attachSkill", id: "review" })
+    state = reducer(state, { type: "attachSkill", id: "tests" })
+    expect(state.pendingSkills).toEqual(["review", "tests"])
+    state = reducer(state, { type: "detachSkill", id: "review" })
+    expect(state.pendingSkills).toEqual(["tests"])
+    expect(reducer(state, { type: "clearSkills" }).pendingSkills).toEqual([])
+  })
+
+  it("drops attached skills that disappear", () => {
+    const skill = { id: "tests", name: "tests", path: "C:\\skills\\tests.md", content: "" } as SkillInfo
+    let state = reducer(initialState(undefined), { type: "attachSkill", id: "gone" })
+    state = reducer(state, { type: "attachSkill", id: "tests" })
+    state = reducer(state, { type: "skills", skills: [skill] })
+    expect(state.pendingSkills).toEqual(["tests"])
   })
 })
 

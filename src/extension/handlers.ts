@@ -162,17 +162,28 @@ export function createHandlers(deps: HandlerDeps): Handlers {
       })
     },
 
-    prompt: async ({ sessionID, text, attachActiveFile }) => {
+    prompt: async ({ sessionID, text, attachActiveFile, skills }) => {
       const client = await deps.client()
       const file = attachActiveFile ? deps.activeFile() : undefined
-      await client.session.prompt({ sessionID, text, files: file ? [fileAttachment(file)] : undefined })
+      await client.session.prompt({
+        sessionID,
+        text,
+        files: file ? [fileAttachment(file)] : undefined,
+        skills: skills?.length ? skills.map((id) => ({ id })) : undefined,
+      })
       return null
     },
 
-    command: async ({ sessionID, name, text, attachActiveFile }) => {
+    command: async ({ sessionID, name, text, attachActiveFile, skills }) => {
       const client = await deps.client()
       const file = attachActiveFile ? deps.activeFile() : undefined
-      await client.session.command({ sessionID, name, text, files: file ? [fileAttachment(file)] : undefined })
+      await client.session.command({
+        sessionID,
+        name,
+        text,
+        files: file ? [fileAttachment(file)] : undefined,
+        skills: skills?.length ? skills.map((id) => ({ id })) : undefined,
+      })
       return null
     },
 
@@ -240,6 +251,41 @@ export function createHandlers(deps: HandlerDeps): Handlers {
     reconnect: async () => {
       await deps.reconnect()
       return null
+    },
+
+    listMcp: async () => {
+      const client = await deps.client()
+      return (await client.mcp.list({ location: location() })).data
+    },
+
+    connectMcp: async ({ server }) => {
+      const client = await deps.client()
+      await client.mcp.connect({ server, location: location() })
+      return null
+    },
+
+    disconnectMcp: async ({ server }) => {
+      const client = await deps.client()
+      await client.mcp.disconnect({ server, location: location() })
+      return null
+    },
+
+    // check asks the package registry for newer versions, which marks outdated plugins.
+    listPlugins: async ({ check }) => {
+      const client = await deps.client()
+      const result = check ? await client.plugin.check({ location: location() }) : await client.plugin.list({ location: location() })
+      return result.data
+    },
+
+    updatePlugins: async ({ targets }) => {
+      const client = await deps.client()
+      await client.plugin.update({ location: location(), targets })
+      return null
+    },
+
+    listSkills: async () => {
+      const client = await deps.client()
+      return (await client.skill.list({ location: location() })).data
     },
   }
 }

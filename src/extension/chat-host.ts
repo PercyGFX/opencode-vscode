@@ -18,6 +18,9 @@ const FORWARDED_TYPES = new Set([
   "config.updated",
   "integration.updated",
   "credential.switched",
+  "mcp.status.changed",
+  "plugin.updated",
+  "skill.updated",
 ])
 
 const isForwarded = (event: OpenCodeEvent) =>

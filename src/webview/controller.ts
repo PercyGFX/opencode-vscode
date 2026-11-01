@@ -78,10 +78,55 @@ export function createController(getState: () => State, dispatch: (action: Actio
   const openSessionIDs = () =>
     getState().tabs.flatMap((tab) => (tab.kind === "session" ? [tab.sessionID] : []))
 
+  const loadMcp = async () => {
+    try {
+      dispatch({ type: "mcp", servers: await request("listMcp", {}) })
+    } catch (error) {
+      notice(error)
+    }
+  }
+
+  const setMcpConnected = async (server: string, connected: boolean) => {
+    try {
+      await request(connected ? "connectMcp" : "disconnectMcp", { server })
+    } catch (error) {
+      notice(error)
+    }
+    await loadMcp()
+  }
+
+  const loadPlugins = async (check = false) => {
+    try {
+      dispatch({ type: "plugins", plugins: await request("listPlugins", check ? { check: true } : {}) })
+    } catch (error) {
+      notice(error)
+    }
+  }
+
+  const updatePlugins = async (targets: string[]) => {
+    try {
+      await request("updatePlugins", { targets })
+    } catch (error) {
+      notice(error)
+    }
+    await loadPlugins()
+  }
+
+  const loadSkills = async () => {
+    try {
+      dispatch({ type: "skills", skills: await request("listSkills", {}) })
+    } catch (error) {
+      notice(error)
+    }
+  }
+
   const refreshAll = () =>
     debounce("refreshAll", 200, () => {
       void bootstrap()
       void refreshHistory()
+      void loadMcp()
+      void loadPlugins()
+      void loadSkills()
       for (const sessionID of openSessionIDs()) void loadSession(sessionID)
     })
 
@@ -92,6 +137,18 @@ export function createController(getState: () => State, dispatch: (action: Actio
     }
     if (BOOTSTRAP_EVENTS.has(event.type)) {
       debounce("bootstrap", 300, () => void bootstrap())
+      return
+    }
+    if (event.type === "mcp.status.changed") {
+      debounce("mcp", 300, () => void loadMcp())
+      return
+    }
+    if (event.type === "plugin.updated") {
+      debounce("plugins", 300, () => void loadPlugins())
+      return
+    }
+    if (event.type === "skill.updated") {
+      debounce("skills", 300, () => void loadSkills())
       return
     }
     switch (event.type) {
@@ -138,8 +195,13 @@ export function createController(getState: () => State, dispatch: (action: Actio
       }
       const sessionID = await ensureSession()
       if (!sessionID) return false
-      if (slash && command) await request("command", { sessionID, name: command.name, text: slash.args, attachActiveFile })
-      else await request("prompt", { sessionID, text, attachActiveFile })
+      const skills = state.pendingSkills.length ? { skills: state.pendingSkills } : {}
+      if (slash && command) {
+        await request("command", { sessionID, name: command.name, text: slash.args, attachActiveFile, ...skills })
+      } else {
+        await request("prompt", { sessionID, text, attachActiveFile, ...skills })
+      }
+      dispatch({ type: "clearSkills" })
       dispatch({ type: "sessionError", sessionID, error: undefined })
       return true
     } catch (error) {
@@ -270,6 +332,11 @@ export function createController(getState: () => State, dispatch: (action: Actio
     openFile,
     openDiff,
     reconnect,
+    loadMcp,
+    setMcpConnected,
+    loadPlugins,
+    updatePlugins,
+    loadSkills,
   }
 }
 

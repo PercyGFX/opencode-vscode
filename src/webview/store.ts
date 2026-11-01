@@ -1,4 +1,12 @@
-import type { OpenCodeEvent, PermissionRequest, SessionInfo, SessionMessageInfo } from "@opencode/client"
+import type {
+  McpServer,
+  OpenCodeEvent,
+  PermissionRequest,
+  PluginInfo,
+  SessionInfo,
+  SessionMessageInfo,
+  SkillInfo,
+} from "@opencode/client"
 import { readFileDiffs } from "../shared/diff.ts"
 import type { ModeId } from "../shared/modes.ts"
 import type { ActiveFile, Bootstrap, ConnectionState, LoadedSession, ModelChoice } from "../shared/protocol.ts"
@@ -46,6 +54,12 @@ export type State = {
   // The model and mode last picked; new sessions start with them.
   lastModel?: ModelChoice
   lastMode?: ModeId
+  // MCP servers and plugins OpenCode runs for this workspace, once loaded.
+  mcp?: McpServer[]
+  plugins?: PluginInfo[]
+  skills?: SkillInfo[]
+  // Skills attached to the next message.
+  pendingSkills: string[]
   notice?: string
 }
 
@@ -74,6 +88,12 @@ export type Action =
   | { type: "permissionResolved"; sessionID: string; requestID: string }
   | { type: "formResolved"; sessionID: string; formID: string }
   | { type: "notice"; text: string | undefined }
+  | { type: "mcp"; servers: McpServer[] }
+  | { type: "plugins"; plugins: PluginInfo[] }
+  | { type: "skills"; skills: SkillInfo[] }
+  | { type: "attachSkill"; id: string }
+  | { type: "detachSkill"; id: string }
+  | { type: "clearSkills" }
 
 const draftTab = (counter: number, mode: ModeId, model?: ModelChoice): DraftTab => ({
   kind: "draft",
@@ -99,6 +119,7 @@ export function initialState(persisted: Persisted | undefined): State {
     activeFile: undefined,
     attachActiveFile: persisted?.attachActiveFile ?? true,
     draftCounter: 2,
+    pendingSkills: [],
   }
 }
 
@@ -611,5 +632,26 @@ export function reducer(state: State, action: Action): State {
 
     case "notice":
       return action.text ? { ...state, notice: action.text } : { ...state, notice: undefined }
+
+    case "mcp":
+      return { ...state, mcp: action.servers }
+
+    case "plugins":
+      return { ...state, plugins: action.plugins }
+
+    case "skills": {
+      // Drop attached skills that no longer exist.
+      const known = new Set(action.skills.map((skill) => skill.id))
+      return { ...state, skills: action.skills, pendingSkills: state.pendingSkills.filter((id) => known.has(id)) }
+    }
+
+    case "attachSkill":
+      return state.pendingSkills.includes(action.id) ? state : { ...state, pendingSkills: [...state.pendingSkills, action.id] }
+
+    case "detachSkill":
+      return { ...state, pendingSkills: state.pendingSkills.filter((id) => id !== action.id) }
+
+    case "clearSkills":
+      return state.pendingSkills.length ? { ...state, pendingSkills: [] } : state
   }
 }

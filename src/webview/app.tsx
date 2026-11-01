@@ -81,6 +81,18 @@ export function App() {
         onNew={() => dispatch({ type: "newDraft" })}
         onOpenSession={(sessionID) => dispatch({ type: "openSession", sessionID })}
         onRefreshHistory={() => void controller.refreshHistory()}
+        extensions={{
+          onOpen: () => {
+            void controller.loadMcp()
+            void controller.loadPlugins()
+            void controller.loadSkills()
+          },
+          onMcp: controller.setMcpConnected,
+          onCheckPlugins: () => controller.loadPlugins(true),
+          onUpdatePlugin: (target) => controller.updatePlugins([target]),
+          onAttachSkill: (id) => dispatch({ type: "attachSkill", id }),
+          onOpenFile: (path) => void controller.openFile(path),
+        }}
       />
       <ConnectionBanner state={state} onRetry={() => void controller.reconnect()} />
       {state.notice ? (
@@ -114,6 +126,8 @@ export function App() {
         models={state.bootstrap?.models ?? []}
         commands={commands}
         usage={usage}
+        skills={state.pendingSkills.map((id) => ({ id, name: state.skills?.find((skill) => skill.id === id)?.name ?? id }))}
+        onDetachSkill={(id) => dispatch({ type: "detachSkill", id })}
         activeFile={state.activeFile}
         attachActiveFile={state.attachActiveFile}
         onToggleAttach={() => dispatch({ type: "toggleAttach" })}

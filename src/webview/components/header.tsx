@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "preact/hooks"
 import type { SessionInfo } from "@opencode/client"
 import type { State, Tab } from "../store.ts"
+import { ExtensionsMenu, extensionsNeedAttention } from "./extensions-menu.tsx"
 import { Icon } from "./icon.tsx"
 
 type HeaderProps = {
@@ -10,6 +11,7 @@ type HeaderProps = {
   onNew: () => void
   onOpenSession: (sessionID: string) => void
   onRefreshHistory: () => void
+  extensions: Omit<Parameters<typeof ExtensionsMenu>[0], "state" | "onClose"> & { onOpen: () => void }
 }
 
 export function sessionTitle(info: SessionInfo | undefined): string {
@@ -34,12 +36,19 @@ export function relativeTime(timestamp: number, now = Date.now()): string {
   return new Date(timestamp).toLocaleDateString()
 }
 
-export function Header({ state, onActivate, onClose, onNew, onOpenSession, onRefreshHistory }: HeaderProps) {
-  const [historyOpen, setHistoryOpen] = useState(false)
+export function Header({ state, onActivate, onClose, onNew, onOpenSession, onRefreshHistory, extensions }: HeaderProps) {
+  const [menu, setMenu] = useState<"history" | "extensions" | undefined>(undefined)
+  const historyOpen = menu === "history"
+  const { onOpen: onOpenExtensions, ...extensionActions } = extensions
 
   const toggleHistory = () => {
     if (!historyOpen) onRefreshHistory()
-    setHistoryOpen(!historyOpen)
+    setMenu(historyOpen ? undefined : "history")
+  }
+
+  const toggleExtensions = () => {
+    if (menu !== "extensions") onOpenExtensions()
+    setMenu(menu === "extensions" ? undefined : "extensions")
   }
 
   return (
@@ -77,6 +86,14 @@ export function Header({ state, onActivate, onClose, onNew, onOpenSession, onRef
         })}
       </div>
       <div class="header-actions">
+        <button
+          class={`icon-button${menu === "extensions" ? " pressed" : ""}`}
+          title="MCP servers, plugins and skills"
+          onClick={toggleExtensions}
+        >
+          <Icon name="plug" />
+          {extensionsNeedAttention(state) ? <span class="attention-dot" /> : null}
+        </button>
         <button class={`icon-button${historyOpen ? " pressed" : ""}`} title="Session history" onClick={toggleHistory}>
           <Icon name="history" />
         </button>
@@ -87,12 +104,15 @@ export function Header({ state, onActivate, onClose, onNew, onOpenSession, onRef
       {historyOpen ? (
         <HistoryMenu
           state={state}
-          onClose={() => setHistoryOpen(false)}
+          onClose={() => setMenu(undefined)}
           onOpen={(sessionID) => {
-            setHistoryOpen(false)
+            setMenu(undefined)
             onOpenSession(sessionID)
           }}
         />
+      ) : null}
+      {menu === "extensions" ? (
+        <ExtensionsMenu state={state} onClose={() => setMenu(undefined)} {...extensionActions} />
       ) : null}
     </div>
   )

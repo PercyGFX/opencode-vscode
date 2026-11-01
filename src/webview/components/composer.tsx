@@ -17,6 +17,9 @@ type ComposerProps = {
   models: ModelInfo[]
   commands: SlashCommand[]
   usage: UsageSummary | undefined
+  // Skills attached to the next message.
+  skills: Array<{ id: string; name: string }>
+  onDetachSkill: (id: string) => void
   activeFile: ActiveFile
   attachActiveFile: boolean
   onToggleAttach: () => void
@@ -166,6 +169,19 @@ export function Composer(props: ComposerProps) {
         </div>
       ) : null}
       <div class="input-box">
+        {props.skills.length ? (
+          <div class="attached-skills">
+            {props.skills.map((skill) => (
+              <span key={skill.id} class="chip skill">
+                <Icon name="book" />
+                {skill.name}
+                <button class="chip-remove" title="Remove" onClick={() => props.onDetachSkill(skill.id)}>
+                  <Icon name="close" />
+                </button>
+              </span>
+            ))}
+          </div>
+        ) : null}
         <textarea
           ref={textarea}
           rows={1}

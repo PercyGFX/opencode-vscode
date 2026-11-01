@@ -4,11 +4,14 @@ import type {
   AgentInfo,
   CommandInfo,
   FormDetail,
+  McpServer,
   ModelInfo,
   OpenCodeEvent,
   PermissionRequest,
+  PluginInfo,
   SessionInfo,
   SessionMessageInfo,
+  SkillInfo,
 } from "@opencode/client"
 import type { FileDiffStatus } from "./diff.ts"
 import type { ModeId } from "./modes.ts"
@@ -65,9 +68,12 @@ export type RequestMap = {
   loadSession: { params: { sessionID: string }; result: LoadedSession }
   loadMessages: { params: { sessionID: string }; result: SessionMessageInfo[] }
   createSession: { params: { mode: ModeId; model?: ModelChoice }; result: SessionInfo }
-  prompt: { params: { sessionID: string; text: string; attachActiveFile: boolean }; result: null }
+  prompt: {
+    params: { sessionID: string; text: string; attachActiveFile: boolean; skills?: string[] }
+    result: null
+  }
   command: {
-    params: { sessionID: string; name: string; text: string; attachActiveFile: boolean }
+    params: { sessionID: string; name: string; text: string; attachActiveFile: boolean; skills?: string[] }
     result: null
   }
   compact: { params: { sessionID: string }; result: null }
@@ -91,6 +97,12 @@ export type RequestMap = {
     result: null
   }
   reconnect: { params: Record<string, never>; result: null }
+  listMcp: { params: Record<string, never>; result: McpServer[] }
+  connectMcp: { params: { server: string }; result: null }
+  disconnectMcp: { params: { server: string }; result: null }
+  listPlugins: { params: { check?: boolean }; result: PluginInfo[] }
+  updatePlugins: { params: { targets: string[] }; result: null }
+  listSkills: { params: Record<string, never>; result: SkillInfo[] }
 }
 
 export type RequestMethod = keyof RequestMap
