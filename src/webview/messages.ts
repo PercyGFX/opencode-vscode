@@ -22,11 +22,12 @@ export type UiToolPart = {
 }
 export type UiPart = UiTextPart | UiReasoningPart | UiToolPart
 
-export type UiUserMessage = { kind: "user"; id: string; text: string; files: string[]; pending: boolean }
+export type UiUserMessage = { kind: "user"; id: string; text: string; files: string[]; pending: boolean; created: number }
 export type UiAssistantMessage = {
   kind: "assistant"
   id: string
   agent: string
+  created: number
   parts: UiPart[]
   // Stream key ("text:0", "tool:<id>") → index in parts.
   keys: Record<string, number>
@@ -52,7 +53,14 @@ export function fileLabel(file: { name?: string | null; uri?: string }): string 
 export function toUiMessage(message: SessionMessageInfo): UiMessage | undefined {
   switch (message.type) {
     case "user":
-      return { kind: "user", id: message.id, text: message.text, files: (message.files ?? []).map(fileLabel), pending: false }
+      return {
+        kind: "user",
+        id: message.id,
+        text: message.text,
+        files: (message.files ?? []).map(fileLabel),
+        pending: false,
+        created: message.time.created,
+      }
     case "assistant": {
       const keys: Record<string, number> = {}
       const parts = message.content.map((part, index): UiPart => {
@@ -90,6 +98,7 @@ export function toUiMessage(message: SessionMessageInfo): UiMessage | undefined 
         kind: "assistant",
         id: message.id,
         agent: message.agent,
+        created: message.time.created,
         parts,
         keys,
         done: message.time.completed !== undefined || message.finish !== undefined || message.error !== undefined,

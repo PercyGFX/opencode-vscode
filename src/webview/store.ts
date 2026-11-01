@@ -200,7 +200,15 @@ const updateAssistant = (
     const index = view.messages.findIndex((message) => message.id === messageID)
     const existing = index === -1 ? undefined : view.messages[index]
     if (existing && !isAssistant(existing)) return view
-    const base: UiAssistantMessage = existing ?? { kind: "assistant", id: messageID, agent, parts: [], keys: {}, done: false }
+    const base: UiAssistantMessage = existing ?? {
+      kind: "assistant",
+      id: messageID,
+      agent,
+      created: Date.now(),
+      parts: [],
+      keys: {},
+      done: false,
+    }
     const updated = update(base)
     const messages = [...view.messages]
     if (index === -1) messages.push(updated)
@@ -298,7 +306,14 @@ export function applyEvent(state: State, event: OpenCodeEvent): State {
               ...view,
               messages: [
                 ...view.messages,
-                { kind: "user", id: inboxID, text: item.payload.text, files: (item.payload.files ?? []).map(fileLabel), pending: true },
+                {
+                  kind: "user",
+                  id: inboxID,
+                  text: item.payload.text,
+                  files: (item.payload.files ?? []).map(fileLabel),
+                  pending: true,
+                  created: event.created,
+                },
               ],
             },
       )
@@ -320,8 +335,14 @@ export function applyEvent(state: State, event: OpenCodeEvent): State {
       }))
     }
     case "session.step.started": {
-      const { sessionID, assistantMessageID, agent } = event.data
-      const next = updateAssistant(state, sessionID, assistantMessageID, (message) => ({ ...message, agent }), agent)
+      const { sessionID, assistantMessageID, agent, started } = event.data
+      const next = updateAssistant(
+        state,
+        sessionID,
+        assistantMessageID,
+        (message) => ({ ...message, agent, created: started }),
+        agent,
+      )
       return setStatus(next, sessionID, "busy")
     }
     case "session.text.started": {

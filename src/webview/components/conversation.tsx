@@ -1,9 +1,17 @@
-import { useLayoutEffect, useMemo, useRef } from "preact/hooks"
+import { useLayoutEffect, useMemo, useRef, useState } from "preact/hooks"
+import type { ComponentChildren } from "preact"
+import type { FileDiff } from "../../shared/diff.ts"
 import type { FormAnswerValue } from "../../shared/protocol.ts"
 import { renderMarkdown } from "../markdown.ts"
-import { toolSummary, type UiAssistantMessage, type UiMessage, type UiPart, type UiToolPart } from "../messages.ts"
+import {
+  toolSummary,
+  type UiAssistantMessage,
+  type UiMessage,
+  type UiShellMessage,
+  type UiToolPart,
+  type UiUserMessage,
+} from "../messages.ts"
 import type { SessionView } from "../store.ts"
-import type { FileDiff } from "../../shared/diff.ts"
 import { FormCard, PermissionCard } from "./cards.tsx"
 import { DiffView } from "./diff.tsx"
 import { Icon } from "./icon.tsx"
@@ -19,6 +27,26 @@ type ConversationProps = {
   onCancelForm: (formID: string) => void
   onDismissError: () => void
 }
+
+// A user prompt, or everything OpenCode did in reply to it (drawn as one timeline).
+type Block = { kind: "user"; message: UiUserMessage } | { kind: "turn"; key: string; messages: UiMessage[] }
+
+const groupBlocks = (messages: readonly UiMessage[]): Block[] => {
+  const blocks: Block[] = []
+  for (const message of messages) {
+    if (message.kind === "user") {
+      blocks.push({ kind: "user", message })
+      continue
+    }
+    const last = blocks.at(-1)
+    if (last?.kind === "turn") last.messages.push(message)
+    else blocks.push({ kind: "turn", key: message.id, messages: [message] })
+  }
+  return blocks
+}
+
+const formatTime = (timestamp: number) => new Date(timestamp).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })
+const minuteOf = (timestamp: number) => Math.floor(timestamp / 60_000)
 
 export function Conversation({
   view,
@@ -44,8 +72,11 @@ export function Conversation({
     if (element) stick.current = element.scrollHeight - element.scrollTop - element.clientHeight < 80
   }
 
-  const lastAssistant = [...view.messages].reverse().find((message) => message.kind === "assistant")
-  const working = view.status !== "idle"
+  const blocks = useMemo(() => groupBlocks(view.messages), [view.messages])
+  const lastAssistant = view.messages.findLast((message) => message.kind === "assistant")
+  const working = view.status !== "idle" && (!lastAssistant || lastAssistant.kind !== "assistant" || lastAssistant.done)
+  const workingLabel = view.status === "retry" ? (view.retryMessage ?? "Retrying…") : "Working…"
+  const lastBlock = blocks.at(-1)
 
   return (
     <div class="conversation" ref={scroller} onScroll={onScroll}>
@@ -54,14 +85,19 @@ export function Conversation({
           <Icon name="loading" spin /> Loading session…
         </div>
       ) : null}
-      {view.messages.map((message) => (
-        <MessageView key={message.id} message={message} onOpenFile={onOpenFile} />
-      ))}
-      {working && (!lastAssistant || lastAssistant.kind !== "assistant" || lastAssistant.done) ? (
-        <div class="working">
-          <Icon name="loading" spin /> {view.status === "retry" ? (view.retryMessage ?? "Retrying…") : "Working…"}
-        </div>
-      ) : null}
+      {blocks.map((block) =>
+        block.kind === "user" ? (
+          <UserMessage key={block.message.id} message={block.message} />
+        ) : (
+          <Turn
+            key={block.key}
+            messages={block.messages}
+            working={working && block === lastBlock ? workingLabel : undefined}
+            onOpenFile={onOpenFile}
+          />
+        ),
+      )}
+      {working && lastBlock?.kind !== "turn" ? <Turn messages={[]} working={workingLabel} onOpenFile={onOpenFile} /> : null}
       {view.error ? (
         <div class="banner error">
           <Icon name="error" />
@@ -91,77 +127,109 @@ export function Conversation({
   )
 }
 
-function MessageView({ message, onOpenFile }: { message: UiMessage; onOpenFile: (path: string) => void }) {
-  switch (message.kind) {
-    case "user":
-      return (
-        <div class={`message user${message.pending ? " pending" : ""}`}>
-          <div class="user-text">{message.text}</div>
-          {message.files.length ? (
-            <div class="user-files">
-              {message.files.map((file) => (
-                <span key={file} class="chip">
-                  <Icon name="file" /> {file}
-                </span>
-              ))}
-            </div>
-          ) : null}
-          {message.pending ? <div class="queued">Queued</div> : null}
-        </div>
-      )
-    case "assistant":
-      return <AssistantView message={message} onOpenFile={onOpenFile} />
-    case "note":
-      return <div class={`note ${message.tone}`}>{message.text}</div>
-    case "shell":
-      return (
-        <details class="tool shell">
-          <summary>
-            <Icon name="terminal" />
-            <span class="tool-name">$</span>
-            <span class="tool-summary">{message.command}</span>
-            <span class="tool-state">{message.status}</span>
-          </summary>
-          {message.output ? <pre class="tool-output">{clip(message.output)}</pre> : null}
-        </details>
-      )
-  }
+function UserMessage({ message }: { message: UiUserMessage }) {
+  return (
+    <div class="user-block">
+      <div class="timestamp">{formatTime(message.created)}</div>
+      <div class={`message user${message.pending ? " pending" : ""}`}>
+        <div class="user-text">{message.text}</div>
+        {message.files.length ? (
+          <div class="user-files">
+            {message.files.map((file) => (
+              <span key={file} class="chip">
+                <Icon name="file" /> {file}
+              </span>
+            ))}
+          </div>
+        ) : null}
+        {message.pending ? <div class="queued">Queued</div> : null}
+      </div>
+    </div>
+  )
 }
 
-function AssistantView({ message, onOpenFile }: { message: UiAssistantMessage; onOpenFile: (path: string) => void }) {
+type DotKind = "text" | "thinking" | "note" | "error" | "working" | "streaming" | "running" | "completed"
+
+// One item on the timeline: a dot on the rail, then its content.
+function Row({ dot, children }: { dot: DotKind; children: ComponentChildren }) {
   return (
-    <div class="message assistant">
-      {message.parts.map((part, index) => (
-        <PartView key={index} part={part} onOpenFile={onOpenFile} />
-      ))}
-      {message.error ? (
-        <div class="banner error">
-          <Icon name="error" />
-          <span>{message.error}</span>
-        </div>
+    <div class={`row dot-${dot}`}>
+      <span class="row-dot" />
+      <div class="row-content">{children}</div>
+    </div>
+  )
+}
+
+function Turn({
+  messages,
+  working,
+  onOpenFile,
+}: {
+  messages: UiMessage[]
+  working: string | undefined
+  onOpenFile: (path: string) => void
+}) {
+  let lastMinute: number | undefined
+  return (
+    <div class="turn">
+      {messages.map((message) => {
+        const created = message.kind === "assistant" ? message.created : undefined
+        const showTime = created !== undefined && minuteOf(created) !== lastMinute
+        if (created !== undefined) lastMinute = minuteOf(created)
+        return (
+          <div key={message.id} class="turn-message">
+            {showTime && created !== undefined ? <div class="timestamp">{formatTime(created)}</div> : null}
+            <TurnMessage message={message} onOpenFile={onOpenFile} />
+          </div>
+        )
+      })}
+      {working ? (
+        <Row dot="working">
+          <span class="muted">{working}</span>
+        </Row>
       ) : null}
     </div>
   )
 }
 
-function PartView({ part, onOpenFile }: { part: UiPart; onOpenFile: (path: string) => void }) {
-  switch (part.kind) {
-    case "text":
-      return <Markdown text={part.text} />
-    case "reasoning":
-      if (!part.text.trim()) return null
+function TurnMessage({ message, onOpenFile }: { message: UiMessage; onOpenFile: (path: string) => void }) {
+  switch (message.kind) {
+    case "assistant":
+      return <AssistantRows message={message} onOpenFile={onOpenFile} />
+    case "note":
       return (
-        <details class="reasoning">
-          <summary>
-            {part.done ? <Icon name="lightbulb" /> : <Icon name="loading" spin />}
-            <span>{part.done ? "Thought" : "Thinking…"}</span>
-          </summary>
-          <Markdown text={part.text} />
-        </details>
+        <Row dot={message.tone === "error" ? "error" : "note"}>
+          <span class={message.tone === "error" ? "error-text" : "muted"}>{message.text}</span>
+        </Row>
       )
-    case "tool":
-      return <ToolView part={part} onOpenFile={onOpenFile} />
+    case "shell":
+      return <ShellRow message={message} />
+    case "user":
+      return null
   }
+}
+
+function AssistantRows({ message, onOpenFile }: { message: UiAssistantMessage; onOpenFile: (path: string) => void }) {
+  return (
+    <>
+      {message.parts.map((part, index) => {
+        if (part.kind === "text") {
+          return part.text.trim() ? (
+            <Row key={index} dot="text">
+              <Markdown text={part.text} />
+            </Row>
+          ) : null
+        }
+        if (part.kind === "reasoning") return part.text.trim() ? <Thinking key={index} text={part.text} done={part.done} /> : null
+        return <ToolRow key={part.id} part={part} onOpenFile={onOpenFile} />
+      })}
+      {message.error ? (
+        <Row dot="error">
+          <span class="error-text">{message.error}</span>
+        </Row>
+      ) : null}
+    </>
+  )
 }
 
 function Markdown({ text }: { text: string }) {
@@ -169,24 +237,41 @@ function Markdown({ text }: { text: string }) {
   return <div class="markdown" dangerouslySetInnerHTML={{ __html: html }} />
 }
 
-const TOOL_ICONS: Record<string, string> = {
-  read: "file",
-  edit: "edit",
-  write: "new-file",
-  patch: "diff",
-  shell: "terminal",
-  bash: "terminal",
-  glob: "search",
-  grep: "search",
-  webfetch: "globe",
-  websearch: "globe",
-  subagent: "organization",
-  task: "organization",
-  todo: "checklist",
-  todowrite: "checklist",
-  question: "question",
-  skill: "book",
+function Thinking({ text, done }: { text: string; done: boolean }) {
+  const [open, setOpen] = useState(false)
+  return (
+    <Row dot="thinking">
+      <button class="row-toggle muted" onClick={() => setOpen(!open)}>
+        {done ? "Thinking" : "Thinking…"}
+        <Icon name={open ? "chevron-up" : "chevron-down"} />
+      </button>
+      {open ? <Markdown text={text} /> : null}
+    </Row>
+  )
 }
+
+const TOOL_LABELS: Record<string, string> = {
+  shell: "Shell",
+  bash: "Bash",
+  read: "Read",
+  edit: "Edit",
+  write: "Write",
+  patch: "Patch",
+  glob: "Glob",
+  grep: "Grep",
+  webfetch: "Fetch",
+  websearch: "Search",
+  subagent: "Agent",
+  task: "Agent",
+  todo: "Todos",
+  todowrite: "Todos",
+  question: "Question",
+  skill: "Skill",
+}
+
+const SHELL_TOOLS = new Set(["shell", "bash"])
+
+const toolLabel = (name: string) => TOOL_LABELS[name] ?? name
 
 const filePathOf = (part: UiToolPart): string | undefined => {
   for (const key of ["filePath", "path", "file"]) {
@@ -196,18 +281,37 @@ const filePathOf = (part: UiToolPart): string | undefined => {
   return undefined
 }
 
-function ToolView({ part, onOpenFile }: { part: UiToolPart; onOpenFile: (path: string) => void }) {
-  const summary = toolSummary(part)
-  const filePath = filePathOf(part)
-  const icon = part.status === "error" ? "error" : (TOOL_ICONS[part.name] ?? "tools")
-  const busy = part.status === "streaming" || part.status === "running"
+const stringInput = (part: UiToolPart, key: string): string | undefined => {
+  const value = part.input[key]
+  return typeof value === "string" && value.trim() ? value : undefined
+}
+
+// "Added 3 lines", "Removed 2 lines" or "+3 -2" for edits.
+const changeSummary = (diffs: FileDiff[]): string => {
+  const additions = diffs.reduce((sum, diff) => sum + diff.additions, 0)
+  const deletions = diffs.reduce((sum, diff) => sum + diff.deletions, 0)
+  const lines = (count: number) => `${count} line${count === 1 ? "" : "s"}`
+  if (additions && !deletions) return `Added ${lines(additions)}`
+  if (deletions && !additions) return `Removed ${lines(deletions)}`
+  return `Changed ${lines(additions + deletions)}: +${additions} -${deletions}`
+}
+
+function ToolRow({ part, onOpenFile }: { part: UiToolPart; onOpenFile: (path: string) => void }) {
+  const isShell = SHELL_TOOLS.has(part.name)
+  const [open, setOpen] = useState(isShell)
+  const dot: DotKind = part.status === "error" ? "error" : part.status
+  const command = isShell ? stringInput(part, "command") : undefined
+  const summary = isShell ? (stringInput(part, "description") ?? command ?? "") : toolSummary(part)
+  const filePath = isShell ? undefined : filePathOf(part)
   const input = JSON.stringify(part.input, null, 2)
+  const hasDetails = Boolean(part.diffs?.length || part.output || part.error || input !== "{}")
 
   return (
-    <details class={`tool ${part.status}`}>
-      <summary>
-        {busy ? <Icon name="loading" spin /> : <Icon name={icon} />}
-        <span class="tool-name">{part.name}</span>
+    <Row dot={dot}>
+      <div class="tool-heading">
+        <button class="row-toggle" disabled={!hasDetails} onClick={() => setOpen(!open)}>
+          <span class="tool-name">{toolLabel(part.name)}</span>
+        </button>
         {filePath ? (
           <a
             class="tool-summary link"
@@ -220,23 +324,62 @@ function ToolView({ part, onOpenFile }: { part: UiToolPart; onOpenFile: (path: s
             {summary}
           </a>
         ) : (
-          <span class="tool-summary">{summary}</span>
+          <span class="tool-summary" title={summary} onClick={() => hasDetails && setOpen(!open)}>
+            {summary}
+          </span>
         )}
-      </summary>
-      {part.diffs?.length ? (
-        <div class="tool-diffs">
-          {part.diffs.map((diff) => (
-            <DiffView key={diff.file} diff={diff} />
-          ))}
+      </div>
+      {part.diffs?.length ? <div class="tool-caption">{changeSummary(part.diffs)}</div> : null}
+      {open || part.status === "error" ? (
+        part.diffs?.length ? (
+          <div class="tool-diffs">
+            {part.diffs.map((diff) => (
+              <DiffView key={diff.file} diff={diff} />
+            ))}
+          </div>
+        ) : (
+          <IoBox
+            input={command ?? (input !== "{}" ? input : undefined)}
+            output={part.error ?? (part.output || undefined)}
+            failed={Boolean(part.error)}
+          />
+        )
+      ) : null}
+    </Row>
+  )
+}
+
+function ShellRow({ message }: { message: UiShellMessage }) {
+  const dot: DotKind = message.status === "running" ? "running" : message.status === "exited" ? "completed" : "error"
+  return (
+    <Row dot={dot}>
+      <div class="tool-heading">
+        <span class="tool-name">Shell</span>
+        <span class="tool-summary">{message.command}</span>
+      </div>
+      <IoBox input={message.command} output={message.output || undefined} failed={dot === "error"} />
+    </Row>
+  )
+}
+
+// Claude Code-style box: what went in, what came out.
+function IoBox({ input, output, failed }: { input?: string; output?: string; failed?: boolean }) {
+  if (!input && !output) return null
+  return (
+    <div class="io-box">
+      {input ? (
+        <div class="io-row">
+          <span class="io-label">IN</span>
+          <pre class="io-text">{clip(input)}</pre>
         </div>
-      ) : (
-        <>
-          {input !== "{}" ? <pre class="tool-input">{clip(input)}</pre> : null}
-          {part.output ? <pre class="tool-output">{clip(part.output)}</pre> : null}
-        </>
-      )}
-      {part.error ? <pre class="tool-output error">{part.error}</pre> : null}
-    </details>
+      ) : null}
+      {output ? (
+        <div class="io-row">
+          <span class="io-label">OUT</span>
+          <pre class={`io-text${failed ? " error-text" : ""}`}>{clip(output)}</pre>
+        </div>
+      ) : null}
+    </div>
   )
 }
 
