@@ -88,6 +88,21 @@ describe("browserActivity", () => {
     expect(activity?.actions).toEqual([{ label: "Read network requests", running: true }])
   })
 
+  it("explains how to fix Chrome not being reachable, and clears it once a call works", () => {
+    const failed = execute(
+      'const pages = await tools["chrome-devtools"].list_pages();',
+      "Could not connect to Chrome. Check if Chrome is running and remote debugging is enabled by going to chrome://inspect/#remote-debugging.\nCause: Could not find DevToolsActivePort",
+    )
+    const blocked = browserActivity([assistant(failed)])
+    expect(blocked?.problem).toContain("chrome://inspect/#remote-debugging")
+    const working = browserActivity([
+      assistant(failed),
+      assistant(execute('await tools["chrome-devtools"].list_pages()', "## Pages\n1: https://hushcasino.com/ [selected]")),
+    ])
+    expect(working?.problem).toBeUndefined()
+    expect(working?.url).toBe("https://hushcasino.com/")
+  })
+
   it("ignores tool discovery and unrelated tools", () => {
     expect(
       browserActivity([

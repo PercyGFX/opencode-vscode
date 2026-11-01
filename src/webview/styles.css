@@ -668,6 +668,16 @@ pre {
   min-width: 0;
 }
 
+.browser-strip.problem {
+  border-color: var(--vscode-inputValidation-warningBorder, var(--vscode-editorWarning-foreground));
+}
+
+.browser-problem {
+  padding: 0 12px 8px 32px;
+  color: var(--vscode-editorWarning-foreground);
+  overflow-wrap: anywhere;
+}
+
 .browser-details {
   padding: 2px 12px 8px;
   display: flex;

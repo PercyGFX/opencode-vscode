@@ -14,7 +14,19 @@ export type BrowserActivity = {
   running: boolean
   // Most recent last.
   actions: BrowserAction[]
+  // Set when the last browser call couldn't reach the browser, with how to fix it.
+  problem?: string
 }
+
+// Chrome DevTools reports this when remote debugging is off in the user's Chrome;
+// models often don't pass the fix on, so the chat shows it.
+const CONNECTION_ERRORS: Array<[RegExp, string]> = [
+  [
+    /Could not connect to Chrome|DevToolsActivePort/i,
+    "Can't reach Chrome. In Chrome (144 or newer), open chrome://inspect/#remote-debugging and turn on remote debugging, then ask again.",
+  ],
+  [/ECONNREFUSED|browser has been closed|Target closed/i, "The browser closed or isn't running. Open it and ask again."],
+]
 
 const BROWSER_SERVER = /^(playwright|chrome[-_]?devtools|[\w-]*browser[\w-]*)$/i
 // tools.playwright.browser_click( or tools["chrome-devtools"].click(
@@ -92,6 +104,8 @@ export function browserActivity(messages: readonly UiMessage[]): BrowserActivity
       const nextUrl = url ?? current.url
       const nextTitle = lastMatch(text, /Page Title:\s*(.+)/g) ?? (url && url !== current.url ? undefined : current.title)
       const nextConsole = lastMatch(text, /Console:\s*(.+)/g) ?? current.console
+      // A call that finished without a connection error clears an earlier problem.
+      const problem = running ? current.problem : CONNECTION_ERRORS.find(([pattern]) => pattern.test(text))?.[1]
       activity = {
         server: calls.at(-1)![0],
         running,
@@ -99,6 +113,7 @@ export function browserActivity(messages: readonly UiMessage[]): BrowserActivity
         ...(nextUrl ? { url: nextUrl } : {}),
         ...(nextTitle ? { title: nextTitle } : {}),
         ...(nextConsole ? { console: nextConsole } : {}),
+        ...(problem ? { problem } : {}),
       }
     }
   }
