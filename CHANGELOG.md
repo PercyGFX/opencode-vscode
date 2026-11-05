@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.0.1
+
+- Closing a chat tab, or an editor tab with chats in it, now stops its running sessions, as pressing Esc does. Before, they kept running in the background and spending tokens. A session still open in another view keeps running.
+
 ## 1.0.0
 
 First public release.
