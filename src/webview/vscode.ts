@@ -50,6 +50,10 @@ export function notifyReady(): void {
   api.postMessage({ type: "ready" })
 }
 
+export function notifyTabs(sessionIDs: string[]): void {
+  api.postMessage({ type: "tabs", sessionIDs })
+}
+
 export function loadPersisted(): Persisted | undefined {
   const raw = api.getState()
   if (typeof raw !== "object" || raw === null) return undefined

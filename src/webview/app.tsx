@@ -11,7 +11,7 @@ import { createController } from "./controller.ts"
 import { resolveModel } from "./models.ts"
 import { activeTab, initialState, lastContextTokens, persistable, reducer, type State } from "./store.ts"
 import { summarizeUsage } from "./usage.ts"
-import { loadPersisted, notifyReady, onHostMessage, savePersisted } from "./vscode.ts"
+import { loadPersisted, notifyReady, notifyTabs, onHostMessage, savePersisted } from "./vscode.ts"
 
 export function App() {
   const [state, dispatch] = useReducer(reducer, undefined, () => initialState(loadPersisted()))
@@ -63,6 +63,11 @@ export function App() {
   useEffect(() => {
     savePersisted(persistable(state))
   }, [state.tabs, state.activeKey, state.attachActiveFile])
+
+  // The extension stops a running session once no chat view shows it any more.
+  useEffect(() => {
+    notifyTabs(state.tabs.flatMap((tab) => (tab.kind === "session" ? [tab.sessionID] : [])))
+  }, [state.tabs])
 
   // Esc stops OpenCode from anywhere in the panel, like Claude Code. Open menus
   // handle Esc themselves (closing), so leave it to them.

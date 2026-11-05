@@ -38,6 +38,8 @@ export type ChatHostOptions = {
 class ChatSurface implements vscode.Disposable {
   private ready = false
   private readonly queued: HostToWebview[] = []
+  // The sessions it has open as tabs, as the webview last reported them.
+  sessionIDs: readonly string[] = []
   private readonly subscription: vscode.Disposable
 
   constructor(
@@ -70,6 +72,7 @@ export class ChatHost implements vscode.WebviewViewProvider, vscode.Disposable {
   private sidebar: ChatSurface | undefined
   private readonly disposables: vscode.Disposable[] = []
   private readonly dist: vscode.Uri
+  private disposed = false
 
   constructor(private readonly options: ChatHostOptions) {
     this.dist = vscode.Uri.joinPath(options.extensionUri, "dist")
@@ -102,7 +105,12 @@ export class ChatHost implements vscode.WebviewViewProvider, vscode.Disposable {
       dark: vscode.Uri.joinPath(this.options.extensionUri, "media", "opencode-dark.svg"),
     }
     const surface = this.attach(panel.webview)
-    panel.onDidDispose(() => this.detach(surface))
+    // Closing the editor tab closes every chat tab in it. The side bar isn't
+    // treated this way: hiding it keeps its tabs, and they come back.
+    panel.onDidDispose(() => {
+      this.detach(surface)
+      this.stopUnseen(surface.sessionIDs)
+    })
   }
 
   // Shows the side bar chat, opening the secondary side bar if it's hidden.
@@ -125,6 +133,7 @@ export class ChatHost implements vscode.WebviewViewProvider, vscode.Disposable {
   }
 
   dispose(): void {
+    this.disposed = true
     for (const surface of this.surfaces) surface.dispose()
     this.surfaces.clear()
     vscode.Disposable.from(...this.disposables).dispose()
@@ -146,6 +155,18 @@ export class ChatHost implements vscode.WebviewViewProvider, vscode.Disposable {
     for (const surface of this.surfaces) surface.post(message)
   }
 
+  // Stops the sessions whose last tab just closed, like pressing Esc, so they
+  // don't keep running (and spending tokens) where nobody can see them.
+  private stopUnseen(closed: readonly string[]) {
+    if (this.disposed) return
+    const shown = new Set([...this.surfaces].flatMap((surface) => surface.sessionIDs))
+    const sessionIDs = closed.filter((sessionID) => !shown.has(sessionID))
+    if (!sessionIDs.length) return
+    this.options.handlers.stopSessions({ sessionIDs }).catch((error: unknown) => {
+      this.options.log.warn(`Could not stop the closed sessions: ${errorMessage(error)}`)
+    })
+  }
+
   private async receive(surface: ChatSurface, message: WebviewToHost) {
     if (message.type === "ready") {
       surface.markReady([
@@ -153,6 +174,12 @@ export class ChatHost implements vscode.WebviewViewProvider, vscode.Disposable {
         { type: "activeFile", file: this.options.activeFile() },
       ])
       this.options.connection.connect().catch(() => undefined)
+      return
+    }
+    if (message.type === "tabs") {
+      const closed = surface.sessionIDs.filter((sessionID) => !message.sessionIDs.includes(sessionID))
+      surface.sessionIDs = message.sessionIDs
+      this.stopUnseen(closed)
       return
     }
     if (message.type !== "request") return

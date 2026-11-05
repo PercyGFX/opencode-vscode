@@ -88,6 +88,9 @@ export type RequestMap = {
   }
   compact: { params: { sessionID: string }; result: null }
   interrupt: { params: { sessionID: string }; result: null }
+  // Interrupts the ones still running. The extension calls it itself when a
+  // session's last tab closes, so it doesn't keep spending tokens unseen.
+  stopSessions: { params: { sessionIDs: string[] }; result: null }
   setMode: { params: { sessionID: string; mode: ModeId }; result: SessionInfo }
   setModel: { params: { sessionID: string; model: ModelChoice }; result: SessionInfo }
   remember: { params: { model?: ModelChoice; mode?: ModeId }; result: null }
@@ -126,6 +129,8 @@ export type RequestMethod = keyof RequestMap
 
 export type WebviewToHost =
   | { type: "ready" }
+  // The sessions this view has open as tabs, sent whenever they change.
+  | { type: "tabs"; sessionIDs: string[] }
   | { type: "request"; id: number; method: RequestMethod; params: unknown }
 
 export type HostToWebview =

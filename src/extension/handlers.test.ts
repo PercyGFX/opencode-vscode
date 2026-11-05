@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest"
 import type { SessionInfo, SessionUpdateInput } from "@opencode/client"
 import { META_KEY, modeRules, readModeMeta } from "../shared/modes.ts"
-import { promptFiles, setSessionMode, type ModeClient } from "./handlers.ts"
+import { promptFiles, setSessionMode, stopRunning, type ModeClient, type StopClient } from "./handlers.ts"
 
 const baseSession = (patch: Partial<SessionInfo> = {}): SessionInfo => ({
   id: "ses_1",
@@ -45,6 +45,30 @@ describe("promptFiles", () => {
 
   it("sends nothing when there is nothing to attach", () => {
     expect(promptFiles(undefined, [])).toBeUndefined()
+  })
+})
+
+describe("stopRunning", () => {
+  const fakeStop = (running: string[]) => {
+    const client: StopClient = {
+      active: vi.fn(async () => Object.fromEntries(running.map((id) => [id, { type: "running" as const }]))),
+      interrupt: vi.fn(async () => ({ interrupted: true })),
+    }
+    return client
+  }
+
+  it("interrupts the closed sessions that are still running", async () => {
+    const client = fakeStop(["ses_1", "ses_other"])
+    await stopRunning(client, ["ses_1", "ses_2"])
+    expect(client.interrupt).toHaveBeenCalledTimes(1)
+    expect(client.interrupt).toHaveBeenCalledWith({ sessionID: "ses_1" })
+  })
+
+  it("does nothing when no sessions closed", async () => {
+    const client = fakeStop(["ses_1"])
+    await stopRunning(client, [])
+    expect(client.active).not.toHaveBeenCalled()
+    expect(client.interrupt).not.toHaveBeenCalled()
   })
 })
 

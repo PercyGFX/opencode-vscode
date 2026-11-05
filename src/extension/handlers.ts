@@ -75,6 +75,17 @@ export async function setSessionMode(
   return session.get({ sessionID })
 }
 
+export type StopClient = Pick<OpenCodeClient["session"], "active" | "interrupt">
+
+// Interrupts the sessions that are still running, so a closed tab doesn't keep
+// spending tokens in the background. Idle ones are left alone.
+export async function stopRunning(session: StopClient, sessionIDs: readonly string[]): Promise<void> {
+  if (!sessionIDs.length) return
+  const active = await session.active()
+  const running = sessionIDs.filter((sessionID) => sessionID in active)
+  await Promise.all(running.map((sessionID) => session.interrupt({ sessionID })))
+}
+
 const loadMessages = async (client: OpenCodeClient, sessionID: string): Promise<SessionMessageInfo[]> => {
   const page = await client.message.list({ sessionID, order: "desc", limit: MESSAGE_LIMIT })
   return page.data.reverse()
@@ -207,6 +218,11 @@ export function createHandlers(deps: HandlerDeps): Handlers {
     interrupt: async ({ sessionID }) => {
       const client = await deps.client()
       await client.session.interrupt({ sessionID })
+      return null
+    },
+
+    stopSessions: async ({ sessionIDs }) => {
+      await stopRunning((await deps.client()).session, sessionIDs)
       return null
     },
 

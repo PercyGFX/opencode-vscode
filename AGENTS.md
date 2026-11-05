@@ -46,6 +46,7 @@ src/
 - **Directories are case-sensitive on the server.** VS Code reports `c:\...`; the TUI records `C:\...`. `serverDirectory()` upper-cases the drive so sessions match.
 - **Windows spawn.** The SDK spawns the server without a shell, which can't run npm's `opencode.cmd` shim. `resolveOpencodeCommand()` finds the real `opencode.exe`.
 - **Events aren't filtered by project.** Several session events carry no location. The webview only applies events to sessions it has loaded, and it reloads messages from the server when an execution ends, so the reducer's live updates don't have to be perfect.
+- **Closing a tab stops its session.** Each webview reports its open session tabs (the `tabs` message). When a session's last tab closes, in a chat view or by closing an editor tab, `ChatHost` interrupts it if it's still running. Hiding the side bar doesn't count, because its tabs come back.
 - **Webview requests are a fixed list** (`RequestMap` in `protocol.ts`). Add a handler there instead of passing SDK calls through.
 
 ## Style
